@@ -1,0 +1,1575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DPR Generator — Detailed Project Report Builder</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<style>
+:root{
+  --navy:#152033;
+  --navy-2:#1f3050;
+  --brass:#a9762c;
+  --brass-light:#c89456;
+  --paper:#faf8f3;
+  --paper-2:#f1ede2;
+  --ink:#1c2420;
+  --line:#cfc6b0;
+  --good:#3c6e47;
+  --bad:#a3422f;
+  --shadow:0 1px 2px rgba(21,32,51,.06), 0 8px 24px rgba(21,32,51,.06);
+  --serif:"Source Serif 4","Iowan Old Style","Palatino Linotype",Georgia,serif;
+  --sans:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono","SFMono-Regular",Consolas,monospace;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--paper-2);
+  color:var(--ink);
+  font-family:var(--sans);
+  -webkit-font-smoothing:antialiased;
+}
+@font-face{font-family:dummy;src:local("x");} /* keep stylesheet self-contained, no external font fetch beyond stack fallbacks */
+
+/* ---------- Top bar ---------- */
+.topbar{
+  background:linear-gradient(180deg,var(--navy),var(--navy-2));
+  color:#f3efe3;
+  padding:22px 28px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:20px;
+  position:sticky;
+  top:0;
+  z-index:50;
+  box-shadow:var(--shadow);
+}
+.brand{display:flex;align-items:baseline;gap:12px;}
+.brand .mark{
+  font-family:var(--mono);
+  font-size:11px;
+  letter-spacing:.18em;
+  color:var(--brass-light);
+  border:1px solid var(--brass);
+  padding:3px 7px;
+  border-radius:3px;
+}
+.brand h1{
+  font-family:var(--serif);
+  font-weight:600;
+  font-size:21px;
+  margin:0;
+  letter-spacing:.01em;
+}
+.brand p{margin:2px 0 0;font-size:12.5px;color:#bcc3d4;}
+.topbar-actions{display:flex;gap:10px;flex-wrap:wrap;}
+.btn{
+  font-family:var(--sans);
+  font-size:13.5px;
+  font-weight:600;
+  border:1px solid transparent;
+  border-radius:6px;
+  padding:9px 16px;
+  cursor:pointer;
+  transition:transform .08s ease, box-shadow .15s ease, background .15s ease;
+}
+.btn:active{transform:translateY(1px);}
+.btn-primary{background:var(--brass);color:#1c1404;}
+.btn-primary:hover{background:var(--brass-light);}
+.btn-ghost{background:transparent;color:#f3efe3;border-color:#465a82;}
+.btn-ghost:hover{background:#27395c;}
+
+/* ---------- Layout ---------- */
+.layout{display:grid;grid-template-columns:minmax(340px,440px) 1fr;gap:0;align-items:start;}
+@media (max-width:980px){.layout{grid-template-columns:1fr;}}
+
+.formpane{
+  padding:24px;
+  max-height:calc(100vh - 76px);
+  overflow-y:auto;
+  position:sticky;
+  top:76px;
+  border-right:1px solid var(--line);
+}
+.previewpane{padding:28px 28px 80px;}
+
+/* ---------- Form ---------- */
+.fsection{
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:10px;
+  margin-bottom:14px;
+  overflow:hidden;
+  box-shadow:var(--shadow);
+}
+.fsection > summary{
+  list-style:none;
+  cursor:pointer;
+  padding:13px 16px;
+  font-family:var(--serif);
+  font-weight:600;
+  font-size:14.5px;
+  color:var(--navy);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  background:linear-gradient(180deg,#fff,var(--paper));
+}
+.fsection > summary::-webkit-details-marker{display:none;}
+.fsection > summary .chev{font-size:11px;color:var(--brass);transition:transform .15s;}
+.fsection[open] > summary .chev{transform:rotate(90deg);}
+.fbody{padding:14px 16px 18px;}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
+.frow.single{grid-template-columns:1fr;}
+.frow.three{grid-template-columns:1fr 1fr 1fr;}
+label{
+  display:block;
+  font-size:11.5px;
+  font-weight:600;
+  color:#5a5345;
+  margin-bottom:4px;
+  letter-spacing:.01em;
+}
+input[type=text],input[type=number],textarea,select{
+  width:100%;
+  font-family:var(--sans);
+  font-size:13.5px;
+  padding:7px 9px;
+  border:1px solid #d8d2c2;
+  border-radius:6px;
+  background:#fffdf9;
+  color:var(--ink);
+}
+input:focus,textarea:focus,select:focus{outline:2px solid var(--brass-light);outline-offset:0;border-color:var(--brass);}
+textarea{resize:vertical;min-height:46px;}
+.hint{font-size:10.8px;color:#8a8270;margin-top:2px;}
+.checkrow{display:flex;align-items:center;gap:6px;margin-top:2px;}
+.checkrow input{width:auto;}
+.checkrow label{margin:0;font-weight:500;}
+
+.dyn-row{
+  display:grid;
+  grid-template-columns:1.6fr .7fr .9fr auto;
+  gap:6px;
+  margin-bottom:6px;
+  align-items:end;
+}
+.dyn-row.wage{grid-template-columns:1.4fr .6fr .9fr auto;}
+.dyn-row label{font-size:10px;}
+.iconbtn{
+  border:1px solid #d8d2c2;
+  background:#fff;
+  border-radius:6px;
+  width:30px;height:30px;
+  cursor:pointer;
+  color:var(--bad);
+  font-size:14px;
+  line-height:1;
+}
+.addrow-btn{
+  font-size:12px;
+  font-weight:600;
+  background:none;
+  border:1px dashed var(--brass);
+  color:var(--brass);
+  border-radius:6px;
+  padding:6px 10px;
+  cursor:pointer;
+  margin-top:2px;
+}
+.addrow-btn:hover{background:#fbf3e6;}
+
+.pct-row{display:flex; align-items:center; gap:8px;}
+.pct-row span{font-size:12px;color:#8a8270;width:64px;}
+
+.formpane .footnote{font-size:11px;color:#8a8270;text-align:center;margin-top:18px;line-height:1.5;}
+
+/* ---------- Preview / report ---------- */
+.page{
+  background:#fff;
+  width:100%;
+  max-width:850px;
+  margin:0 auto 26px;
+  padding:46px 52px;
+  box-shadow:var(--shadow);
+  border:1px solid var(--line);
+  font-family:var(--serif);
+  color:#16201a;
+  position:relative;
+}
+.page::before{
+  content:attr(data-pageno);
+  position:absolute;
+  bottom:16px; right:26px;
+  font-family:var(--mono);
+  font-size:10px;
+  color:#a39d8c;
+}
+.rpt-title{
+  text-align:center;
+  font-size:18px;
+  font-weight:700;
+  letter-spacing:.05em;
+  text-transform:uppercase;
+  border-bottom:2.5px solid var(--navy);
+  padding-bottom:10px;
+  margin-bottom:18px;
+  color:var(--navy);
+}
+.rpt-sub{
+  text-align:center;
+  font-family:var(--mono);
+  font-size:11px;
+  color:#8a8270;
+  margin:-12px 0 18px;
+  text-transform:uppercase;
+  letter-spacing:.12em;
+}
+.sec-h{
+  font-weight:700;
+  font-size:13.5px;
+  color:var(--navy);
+  margin:18px 0 8px;
+  border-bottom:1px solid var(--line);
+  padding-bottom:4px;
+}
+.sec-h .num{color:var(--brass);margin-right:6px;font-family:var(--mono);}
+table.rpt{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:10px;}
+table.rpt th,table.rpt td{border:1px solid #cfc6b0;padding:5px 8px;text-align:right;}
+table.rpt th{background:var(--paper);font-weight:700;text-align:center;color:var(--navy);font-family:var(--sans);font-size:10.8px;letter-spacing:.02em;}
+table.rpt td.lbl, table.rpt th.lbl{text-align:left;font-weight:500;}
+table.rpt td.total, table.rpt tr.total td{font-weight:700;background:#fbf8f0;}
+table.rpt tr.grand td{font-weight:700;background:var(--navy);color:#fff;}
+.kv{display:grid;grid-template-columns:230px 1fr;gap:4px 10px;font-size:13px;margin-bottom:5px;}
+.kv .k{font-weight:600;color:#534c3e;}
+.kv .v{font-family:var(--mono);}
+.glance-num{
+  width:24px;height:24px;border-radius:50%;
+  background:var(--navy);color:#fff;
+  display:inline-flex;align-items:center;justify-content:center;
+  font-family:var(--sans);font-size:11px;font-weight:700;
+  margin-right:8px;flex:none;
+}
+.glance-row{display:flex; align-items:flex-start; gap:2px; padding:7px 0; border-bottom:1px dotted var(--line); font-size:13px;}
+.glance-row .gk{font-weight:600;width:230px;flex:none;}
+.glance-row .gv{font-family:var(--mono);}
+.sign-block{margin-top:46px;display:flex;justify-content:space-between;align-items:flex-end;font-size:12.5px;}
+.sign-block .field{margin-bottom:18px;}
+.sign-block .line{border-top:1px solid #16201a;width:190px;margin-top:34px;padding-top:4px;text-align:center;font-size:11px;color:#534c3e;}
+.note-box{font-size:11px;color:#6a6353;font-style:italic;border-top:1px solid var(--line);padding-top:10px;margin-top:8px;}
+
+.badge{display:inline-block;font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:10px;background:#eef3ec;color:var(--good);}
+
+/* print */
+@media print{
+  .topbar,.formpane{display:none !important;}
+  .layout{display:block;}
+  .previewpane{padding:0;}
+  .page{box-shadow:none;border:none;margin:0;page-break-after:always;max-width:none;width:100%;padding:18mm 16mm;}
+  body{background:#fff;}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <span class="mark">DPR</span>
+    <div>
+      <h1>Detailed Project Report Generator</h1>
+      <p>Bank-loan &amp; subsidy project report builder — MSME / small business units</p>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <button class="btn btn-ghost" onclick="window.print()">Download PDF</button>
+    <button class="btn btn-primary" id="xlsxBtn">Download Excel</button>
+  </div>
+</div>
+
+<div class="layout">
+  <div class="formpane" id="formpane"></div>
+  <div class="previewpane" id="previewpane"></div>
+</div>
+
+<script>
+/* =========================================================================
+   STATE — defaults pre-filled with a representative example so the report
+   renders immediately; every field is user-editable.
+   ========================================================================= */
+const state = {
+  name:"",
+  constitution:"Proprietorship",
+  phone:"",
+  address:"",
+  product:"",
+  unitAddress:"",
+  projectName:"",
+  rawMaterialsDesc:"",
+  power:"",
+  employment:0,
+  implMonths:3,
+
+  land:{owned:true, amount:0},
+  workshed:{owned:true, amount:0},
+  machinery:[
+    {desc:"", qty:1, rate:0}
+  ],
+  prelim:0, furniture:0, electrification:0,
+  workingCapital:0,
+
+  ownPct:20, termLoanPct:80, wcLoanPct:80, subsidyPct:40,
+  termLoanRate:10.8, wcLoanRate:10.8, loanTenure:5, wcBullet:true,
+
+  ratePerUnit:0, unitsAt100:0,
+  capacityUtil:[60,70,80,90,100],
+
+  rawMaterials:0,
+  wages:[
+    {role:"", count:1, monthly:0}
+  ],
+  repairs:0, power_cost:0, transportation:0,
+
+  salary:[{role:"", count:0, monthly:0}],
+  telephone:0, stationery:0, advertisement:0, workshedRent:0, otherMisc:0,
+
+  workshedDepPct:10.8, machineryDepPct:15.0,
+  taxPct:0, taxFlat:0,
+
+  place:"", date:"",
+  includeNarrative:true
+};
+
+/* =========================================================================
+   CALCULATION ENGINE — pure, shared by preview + Excel export
+   ========================================================================= */
+function amortize(principal, ratePct, tenure, bullet){
+  const rows=[]; let opening=principal;
+  for(let y=0;y<tenure;y++){
+    const installment = bullet ? 0 : principal/tenure;
+    const interest = opening*ratePct/100;
+    const closing = opening-installment;
+    rows.push({opening,installment,closing,interest});
+    opening = closing;
+  }
+  return rows;
+}
+function depreciateWDV(cost, ratePct, years){
+  const rows=[]; let opening=cost;
+  for(let y=0;y<years;y++){
+    const dep = opening*ratePct/100;
+    const closing = opening-dep;
+    rows.push({opening,dep,closing});
+    opening = closing;
+  }
+  return rows;
+}
+function computeAll(s){
+  const n = s.loanTenure;
+  const years = Array.from({length:n}, (_,i)=>i);
+
+  const machineryRows = s.machinery.map(m=>({...m, amount:(+m.qty||0)*(+m.rate||0)}));
+  const machineryTotal = machineryRows.reduce((a,m)=>a+m.amount,0);
+  const landAmt = s.land.owned ? 0 : (+s.land.amount||0);
+  const workshedAmt = s.workshed.owned ? 0 : (+s.workshed.amount||0);
+  const capex = landAmt+workshedAmt+machineryTotal+(+s.prelim||0)+(+s.furniture||0)+(+s.electrification||0);
+  const wc = +s.workingCapital||0;
+  const totalCost = capex+wc;
+
+  const ownContribution = s.ownPct/100*totalCost;
+  const termLoanPrincipal = s.termLoanPct/100*capex;
+  const wcLoanPrincipal = s.wcLoanPct/100*wc;
+  const subsidy = s.subsidyPct/100*totalCost;
+  const bankFinanceTotal = termLoanPrincipal+wcLoanPrincipal;
+
+  const termLoanRows = amortize(termLoanPrincipal, s.termLoanRate, n, false);
+  const wcLoanRows = amortize(wcLoanPrincipal, s.wcLoanRate, n, !!s.wcBullet);
+
+  const workshedDep = depreciateWDV(workshedAmt, s.workshedDepPct, n);
+  const machineryDep = depreciateWDV(machineryTotal, s.machineryDepPct, n);
+  const totalDep = years.map(i=>workshedDep[i].dep+machineryDep[i].dep);
+
+  const salesAt100 = (+s.ratePerUnit||0)*(+s.unitsAt100||0);
+  const cap = s.capacityUtil;
+  const sales = years.map(i=>(cap[i]||0)/100*salesAt100);
+
+  const wagesAnnual100 = s.wages.reduce((a,w)=>a+(+w.count||0)*(+w.monthly||0)*12,0);
+  const salaryAnnual100 = s.salary.reduce((a,w)=>a+(+w.count||0)*(+w.monthly||0)*12,0);
+
+  const scale = (base100)=>years.map(i=>(cap[i]||0)/100*base100);
+  const rawMaterials = scale(+s.rawMaterials||0);
+  const wages = scale(wagesAnnual100);
+  const repairs = scale(+s.repairs||0);
+  const power = scale(+s.power_cost||0);
+  const transport = scale(+s.transportation||0);
+
+  const salary = scale(salaryAnnual100);
+  const telephone = scale(+s.telephone||0);
+  const stationery = scale(+s.stationery||0);
+  const advertisement = scale(+s.advertisement||0);
+  const workshedRent = years.map(()=>+s.workshedRent||0); // not scaled — flat, per reference
+  const otherMisc = scale(+s.otherMisc||0);
+
+  const productionCost = years.map(i=>rawMaterials[i]+wages[i]+repairs[i]+power[i]+transport[i]+totalDep[i]);
+  const adminCost = years.map(i=>salary[i]+telephone[i]+stationery[i]+advertisement[i]+workshedRent[i]+otherMisc[i]);
+  const costOfSale = years.map(i=>productionCost[i]+adminCost[i]+termLoanRows[i].interest+wcLoanRows[i].interest);
+  const netProfitBeforeTax = years.map(i=>sales[i]-costOfSale[i]);
+  const tax = years.map(i=>(s.taxPct/100)*Math.max(netProfitBeforeTax[i],0) + (+s.taxFlat||0));
+  const netProfit = years.map(i=>netProfitBeforeTax[i]-tax[i]);
+
+  const dscr = years.map(i=>{
+    const a = netProfit[i]+totalDep[i];
+    const b = termLoanRows[i].interest+termLoanRows[i].installment+wcLoanRows[i].interest;
+    return b!==0 ? a/b : 0;
+  });
+
+  const grossFixedAssets = workshedAmt+machineryTotal+(+s.furniture||0)+(+s.electrification||0);
+  let cumProfit=0, cumDep=0;
+  const balanceSheet = years.map(i=>{
+    cumProfit += netProfit[i];
+    cumDep += totalDep[i];
+    const liabilities = ownContribution+cumProfit+termLoanRows[i].closing+wcLoanRows[i].closing;
+    const netFixedAssets = grossFixedAssets-cumDep;
+    const currentAssets = wc;
+    const cashInBank = liabilities-(netFixedAssets+(+s.prelim||0)+currentAssets);
+    const totalAssets = netFixedAssets+(+s.prelim||0)+currentAssets+cashInBank;
+    return {promotersCapital:ownContribution, cumProfit, termLoanClosing:termLoanRows[i].closing,
+      wcLoanClosing:wcLoanRows[i].closing, liabilities, grossFixedAssets, cumDep, netFixedAssets,
+      prelim:+s.prelim||0, currentAssets, cashInBank, totalAssets};
+  });
+
+  let openingBal=0;
+  const cashFlow = years.map(i=>{
+    const sources = netProfit[i]+totalDep[i]+termLoanRows[i].opening+wcLoanRows[i].opening+(i===0?ownContribution:0);
+    const usesLoan = termLoanRows[i].installment+wcLoanRows[i].installment;
+    const uses = usesLoan+wc;
+    const surplus = sources-uses;
+    const closingBal = openingBal+surplus;
+    const row = {sources, uses, usesLoan, openingBal, surplus, closingBal};
+    openingBal = closingBal;
+    return row;
+  });
+
+  const breakEven = years.map(i=>{
+    const fixedCost = adminCost[i]+termLoanRows[i].interest+totalDep[i];
+    // Matches the reference workbook's actual arithmetic: Production Cost (which already
+    // includes depreciation) is reused whole inside Variable Cost, so depreciation appears
+    // in both Fixed Cost and (embedded) Variable Cost — verified against the source file.
+    const variableCost = productionCost[i]+wcLoanRows[i].interest;
+    const totalCostY = fixedCost+variableCost;
+    const contribution = sales[i]-variableCost;
+    const bepPct = contribution!==0 ? fixedCost/contribution : 0;
+    const beSales = bepPct*sales[i];
+    const beUnits = (+s.ratePerUnit||0)!==0 ? beSales/s.ratePerUnit : 0;
+    return {fixedCost, variableCost, totalCostY, contribution, bepPct, beSales, beUnits};
+  });
+  const currentRatio = years.map(i=>{
+    const j = i+1<n ? i+1 : i;
+    const denom = termLoanRows[j].interest+termLoanRows[j].installment+wcLoanRows[j].interest+wcLoanRows[j].installment;
+    return denom!==0 ? wc/denom : 0;
+  });
+  const netProfitRatio = years.map(i=> sales[i]!==0 ? netProfit[i]/sales[i] : 0);
+
+  return {
+    n, years, machineryRows, machineryTotal, landAmt, workshedAmt, capex, wc, totalCost,
+    ownContribution, termLoanPrincipal, wcLoanPrincipal, subsidy, bankFinanceTotal,
+    termLoanRows, wcLoanRows, workshedDep, machineryDep, totalDep,
+    salesAt100, sales, rawMaterials, wages, repairs, power, transport,
+    salary, telephone, stationery, advertisement, workshedRent, otherMisc,
+    productionCost, adminCost, costOfSale, netProfitBeforeTax, tax, netProfit, dscr,
+    grossFixedAssets, balanceSheet, cashFlow, breakEven, currentRatio, netProfitRatio
+  };
+}
+
+/* =========================================================================
+   FORMAT HELPERS
+   ========================================================================= */
+const inr = n => "Rs. " + Math.round(n||0).toLocaleString('en-IN');
+const inrPlain = n => Math.round(n||0).toLocaleString('en-IN');
+const pct = n => (n*100).toFixed(2)+"%";
+const yearHeads = n => Array.from({length:n},(_,i)=>["1st","2nd","3rd","4th","5th","6th","7th","8th"][i]+" Year");
+
+/* =========================================================================
+   FORM RENDERING
+   ========================================================================= */
+const formpane = document.getElementById('formpane');
+
+function section(title, bodyHtml, open){
+  return `<details class="fsection" ${open?"open":""}>
+    <summary>${title}<span class="chev">&#9656;</span></summary>
+    <div class="fbody">${bodyHtml}</div>
+  </details>`;
+}
+
+function renderForm(){
+  formpane.innerHTML =
+    section("0. Report Options", `
+      <div class="checkrow"><input id="f_includeNarrative" type="checkbox" ${state.includeNarrative?"checked":""}><label for="f_includeNarrative">Include narrative report (Introduction, Promoter Profile, Market Analysis, SWOT, Marketing Strategy) ahead of the financial pages</label></div>
+      <p class="hint">These sections are written automatically from the data you enter below — no fixed names or figures are pre-filled.</p>
+    `, true) +
+
+    section("1. Entrepreneur &amp; Unit", `
+      <div class="frow single"><div><label>Name of Entrepreneur</label><input id="f_name" type="text" value="${state.name}" placeholder="e.g. Full name as per application"></div></div>
+      <div class="frow">
+        <div><label>Constitution</label>
+          <select id="f_constitution">
+            ${["Proprietorship","Partnership","Co-operative Society","Registered Institution","SHG","Trust"].map(c=>`<option ${state.constitution===c?"selected":""}>${c}</option>`).join("")}
+          </select>
+        </div>
+        <div><label>Phone Number</label><input id="f_phone" type="text" value="${state.phone}" placeholder="10-digit mobile number"></div>
+      </div>
+      <div class="frow single"><div><label>Address (with pincode)</label><textarea id="f_address" placeholder="House name, place, district, pincode">${state.address}</textarea></div></div>
+      <div class="frow">
+        <div><label>Product / By-Product</label><input id="f_product" type="text" value="${state.product}" placeholder="e.g. Product / unit trade name"></div>
+        <div><label>Name of Project / Business Activity</label><input id="f_projectName" type="text" value="${state.projectName}" placeholder="e.g. Nature of business"></div>
+      </div>
+      <div class="frow single"><div><label>Unit Address</label><input id="f_unitAddress" type="text" value="${state.unitAddress}" placeholder="Address where the unit will operate"></div></div>
+      <div class="frow">
+        <div><label>Major Raw Materials</label><input id="f_rawMaterialsDesc" type="text" value="${state.rawMaterialsDesc}" placeholder="e.g. Key raw materials used"></div>
+        <div><label>Power Requirement (kW)</label><input id="f_power" type="text" value="${state.power}" placeholder="e.g. 1"></div>
+      </div>
+      <div class="frow">
+        <div><label>Employment Generated</label><input id="f_employment" type="number" value="${state.employment}"></div>
+        <div><label>Implementation Period (months)</label><input id="f_implMonths" type="number" value="${state.implMonths}"></div>
+      </div>
+    `, true) +
+
+    section("2. Fixed Capital Investment", `
+      <div class="frow">
+        <div><label>Land</label><input id="f_landAmount" type="number" value="${state.land.amount}" ${state.land.owned?"disabled":""}></div>
+        <div><div class="checkrow" style="margin-top:22px"><input id="f_landOwned" type="checkbox" ${state.land.owned?"checked":""}><label for="f_landOwned">Owned (no cost)</label></div></div>
+      </div>
+      <div class="frow">
+        <div><label>Workshed</label><input id="f_workshedAmount" type="number" value="${state.workshed.amount}" ${state.workshed.owned?"disabled":""}></div>
+        <div><div class="checkrow" style="margin-top:22px"><input id="f_workshedOwned" type="checkbox" ${state.workshed.owned?"checked":""}><label for="f_workshedOwned">Owned (no cost)</label></div></div>
+      </div>
+      <label style="margin-top:8px">Machinery / Equipment</label>
+      <div id="machineryRows"></div>
+      <button class="addrow-btn" id="addMachinery" type="button">+ Add machinery item</button>
+      <div class="frow" style="margin-top:10px">
+        <div><label>Preliminary &amp; Pre-operative Cost</label><input id="f_prelim" type="number" value="${state.prelim}"></div>
+        <div><label>Furniture &amp; Fixtures</label><input id="f_furniture" type="number" value="${state.furniture}"></div>
+      </div>
+      <div class="frow">
+        <div><label>Electrification</label><input id="f_electrification" type="number" value="${state.electrification}"></div>
+        <div><label>Working Capital</label><input id="f_workingCapital" type="number" value="${state.workingCapital}"></div>
+      </div>
+    `, true) +
+
+    section("3. Means of Financing", `
+      <div class="pct-row"><span>Own Contribution</span><input id="f_ownPct" type="number" value="${state.ownPct}" style="width:70px"><span>% of total cost</span></div>
+      <div class="pct-row"><span>Term Loan</span><input id="f_termLoanPct" type="number" value="${state.termLoanPct}" style="width:70px"><span>% of capex</span></div>
+      <div class="pct-row"><span>Working Capital Loan</span><input id="f_wcLoanPct" type="number" value="${state.wcLoanPct}" style="width:70px"><span>% of WC</span></div>
+      <div class="pct-row"><span>Subsidy</span><input id="f_subsidyPct" type="number" value="${state.subsidyPct}" style="width:70px"><span>% (informational)</span></div>
+      <div class="frow" style="margin-top:10px">
+        <div><label>Term Loan Interest %</label><input id="f_termLoanRate" type="number" step="0.01" value="${state.termLoanRate}"></div>
+        <div><label>WC Loan Interest %</label><input id="f_wcLoanRate" type="number" step="0.01" value="${state.wcLoanRate}"></div>
+      </div>
+      <div class="frow">
+        <div>
+          <label>Loan Tenure (years)</label>
+          <div style="display:flex;border:1px solid #d8d2c2;border-radius:6px;overflow:hidden;width:fit-content">
+            <button type="button" class="tenure-btn" data-yr="5"
+              style="padding:7px 26px;font-family:var(--sans);font-size:13.5px;font-weight:600;border:none;cursor:pointer;
+                     background:${state.loanTenure===5?'var(--navy)':'#fffdf9'};
+                     color:${state.loanTenure===5?'#fff':'var(--ink)'}">5 Years</button>
+            <button type="button" class="tenure-btn" data-yr="7"
+              style="padding:7px 26px;font-family:var(--sans);font-size:13.5px;font-weight:600;border:none;border-left:1px solid #d8d2c2;cursor:pointer;
+                     background:${state.loanTenure===7?'var(--navy)':'#fffdf9'};
+                     color:${state.loanTenure===7?'#fff':'var(--ink)'}">7 Years</button>
+          </div>
+        </div>
+        <div><div class="checkrow" style="margin-top:22px"><input id="f_wcBullet" type="checkbox" ${state.wcBullet?"checked":""}><label for="f_wcBullet">WC loan: bullet repayment (0 installment)</label></div></div>
+      </div>
+    `, false) +
+
+    section("4. Sales", `
+      <div class="frow">
+        <div><label>Rate per Unit / Service (Rs.)</label><input id="f_ratePerUnit" type="number" value="${state.ratePerUnit}"></div>
+        <div><label>Units / Services at 100% Capacity</label><input id="f_unitsAt100" type="number" value="${state.unitsAt100}"></div>
+      </div>
+      <label>${state.loanTenure}-Year Capacity Utilization (%)</label>
+      <div class="frow three" style="grid-template-columns:repeat(${state.loanTenure},1fr)">
+        ${state.capacityUtil.map((c,i)=>`<input class="cap-util" data-i="${i}" type="number" value="${c}">`).join("")}
+      </div>
+    `, false) +
+
+    section("5. Manufacturing Expenses (at 100% capacity, annual)", `
+      <div class="frow single"><div><label>Raw Materials</label><input id="f_rawMaterials" type="number" value="${state.rawMaterials}"></div></div>
+      <label>Wages</label>
+      <div id="wageRows"></div>
+      <button class="addrow-btn" id="addWage" type="button">+ Add worker row</button>
+      <div class="frow" style="margin-top:10px">
+        <div><label>Repairs &amp; Maintenance</label><input id="f_repairs" type="number" value="${state.repairs}"></div>
+        <div><label>Power &amp; Fuel</label><input id="f_power_cost" type="number" value="${state.power_cost}"></div>
+      </div>
+      <div class="frow single"><div><label>Transportation</label><input id="f_transportation" type="number" value="${state.transportation}"></div></div>
+    `, false) +
+
+    section("6. Administrative Expenses (at 100% capacity, annual)", `
+      <label>Salary</label>
+      <div id="salaryRows"></div>
+      <button class="addrow-btn" id="addSalary" type="button">+ Add salary row</button>
+      <div class="frow" style="margin-top:10px">
+        <div><label>Telephone</label><input id="f_telephone" type="number" value="${state.telephone}"></div>
+        <div><label>Stationery &amp; Postage</label><input id="f_stationery" type="number" value="${state.stationery}"></div>
+      </div>
+      <div class="frow">
+        <div><label>Advertisement &amp; Publicity</label><input id="f_advertisement" type="number" value="${state.advertisement}"></div>
+        <div><label>Workshed Rent <span class="hint">(not scaled)</span></label><input id="f_workshedRent" type="number" value="${state.workshedRent}"></div>
+      </div>
+      <div class="frow single"><div><label>Other Miscellaneous</label><input id="f_otherMisc" type="number" value="${state.otherMisc}"></div></div>
+    `, false) +
+
+    section("7. Depreciation &amp; Tax", `
+      <div class="frow">
+        <div><label>Workshed Depreciation %</label><input id="f_workshedDepPct" type="number" step="0.01" value="${state.workshedDepPct}"></div>
+        <div><label>Machinery Depreciation %</label><input id="f_machineryDepPct" type="number" step="0.01" value="${state.machineryDepPct}"></div>
+      </div>
+      <div class="frow">
+        <div><label>Tax %</label><input id="f_taxPct" type="number" step="0.01" value="${state.taxPct}"></div>
+        <div><label>Tax (flat Rs./yr)</label><input id="f_taxFlat" type="number" value="${state.taxFlat}"></div>
+      </div>
+    `, false) +
+
+    section("8. Sign-off", `
+      <div class="frow">
+        <div><label>Place</label><input id="f_place" type="text" value="${state.place}" placeholder="e.g. Place of signing"></div>
+        <div><label>Date</label><input id="f_date" type="text" value="${state.date}" placeholder="DD/MM/YYYY"></div>
+      </div>
+      <p class="hint">Full Name in the signature block is taken automatically from "Name of Entrepreneur" above.</p>
+    `, false) +
+
+    `<p class="footnote">All figures recalculate live as you edit.<br>Use <b>Download PDF</b> (browser print) or <b>Download Excel</b> (live formulas) above.</p>`;
+
+  renderDynamicRows();
+  attachFormListeners();
+}
+
+function renderDynamicRows(){
+  document.getElementById('machineryRows').innerHTML = state.machinery.map((m,i)=>`
+    <div class="dyn-row">
+      <div><label>Description</label><input class="m-desc" data-i="${i}" type="text" value="${m.desc}" placeholder="e.g. Machinery / equipment name"></div>
+      <div><label>Qty</label><input class="m-qty" data-i="${i}" type="number" value="${m.qty}"></div>
+      <div><label>Rate</label><input class="m-rate" data-i="${i}" type="number" value="${m.rate}"></div>
+      <button class="iconbtn m-del" data-i="${i}" type="button" title="Remove">&times;</button>
+    </div>`).join("");
+
+  document.getElementById('wageRows').innerHTML = state.wages.map((w,i)=>`
+    <div class="dyn-row wage">
+      <div><label>Role</label><input class="w-role" data-i="${i}" type="text" value="${w.role}" placeholder="e.g. Skilled worker"></div>
+      <div><label>Count</label><input class="w-count" data-i="${i}" type="number" value="${w.count}"></div>
+      <div><label>Monthly (Rs.)</label><input class="w-monthly" data-i="${i}" type="number" value="${w.monthly}"></div>
+      <button class="iconbtn w-del" data-i="${i}" type="button" title="Remove">&times;</button>
+    </div>`).join("");
+
+  document.getElementById('salaryRows').innerHTML = state.salary.map((w,i)=>`
+    <div class="dyn-row wage">
+      <div><label>Role</label><input class="s-role" data-i="${i}" type="text" value="${w.role}" placeholder="e.g. Manager"></div>
+      <div><label>Count</label><input class="s-count" data-i="${i}" type="number" value="${w.count}"></div>
+      <div><label>Monthly (Rs.)</label><input class="s-monthly" data-i="${i}" type="number" value="${w.monthly}"></div>
+      <button class="iconbtn s-del" data-i="${i}" type="button" title="Remove">&times;</button>
+    </div>`).join("");
+}
+
+function attachFormListeners(){
+  const byId = id=>document.getElementById(id);
+  byId('f_includeNarrative').addEventListener('change', e=>{ state.includeNarrative=e.target.checked; update(); });
+  const bindNum = (id, path)=>{ const el=byId(id); if(el) el.addEventListener('input', ()=>{ setPath(path, +el.value||0); update(); }); };
+  const bindTxt = (id, path)=>{ const el=byId(id); if(el) el.addEventListener('input', ()=>{ setPath(path, el.value); update(); }); };
+
+  bindTxt('f_name','name'); bindTxt('f_phone','phone'); bindTxt('f_address','address');
+  bindTxt('f_product','product'); bindTxt('f_projectName','projectName'); bindTxt('f_unitAddress','unitAddress');
+  bindTxt('f_rawMaterialsDesc','rawMaterialsDesc'); bindTxt('f_power','power');
+  bindNum('f_employment','employment'); bindNum('f_implMonths','implMonths');
+  byId('f_constitution').addEventListener('change', e=>{ state.constitution=e.target.value; update(); });
+
+  byId('f_landOwned').addEventListener('change', e=>{ state.land.owned=e.target.checked; renderForm(); update(); });
+  byId('f_workshedOwned').addEventListener('change', e=>{ state.workshed.owned=e.target.checked; renderForm(); update(); });
+  bindNum('f_landAmount','land.amount'); bindNum('f_workshedAmount','workshed.amount');
+  bindNum('f_prelim','prelim'); bindNum('f_furniture','furniture'); bindNum('f_electrification','electrification');
+  bindNum('f_workingCapital','workingCapital');
+
+  bindNum('f_ownPct','ownPct'); bindNum('f_termLoanPct','termLoanPct'); bindNum('f_wcLoanPct','wcLoanPct'); bindNum('f_subsidyPct','subsidyPct');
+  bindNum('f_termLoanRate','termLoanRate'); bindNum('f_wcLoanRate','wcLoanRate');
+  document.querySelectorAll('.tenure-btn').forEach(btn=>btn.addEventListener('click', e=>{
+    const yr = +e.target.dataset.yr;
+    setTenure(yr);
+  }));
+  byId('f_wcBullet').addEventListener('change', e=>{ state.wcBullet=e.target.checked; update(); });
+
+  bindNum('f_ratePerUnit','ratePerUnit'); bindNum('f_unitsAt100','unitsAt100');
+  document.querySelectorAll('.cap-util').forEach(el=>el.addEventListener('input', e=>{
+    state.capacityUtil[+e.target.dataset.i] = +e.target.value||0; update();
+  }));
+
+  bindNum('f_rawMaterials','rawMaterials'); bindNum('f_repairs','repairs'); bindNum('f_power_cost','power_cost'); bindNum('f_transportation','transportation');
+  bindNum('f_telephone','telephone'); bindNum('f_stationery','stationery'); bindNum('f_advertisement','advertisement');
+  bindNum('f_workshedRent','workshedRent'); bindNum('f_otherMisc','otherMisc');
+  bindNum('f_workshedDepPct','workshedDepPct'); bindNum('f_machineryDepPct','machineryDepPct');
+  bindNum('f_taxPct','taxPct'); bindNum('f_taxFlat','taxFlat');
+
+  bindTxt('f_place','place'); bindTxt('f_date','date');
+
+  byId('addMachinery').addEventListener('click', ()=>{ state.machinery.push({desc:"",qty:1,rate:0}); renderForm(); update(); });
+  document.querySelectorAll('.m-del').forEach(b=>b.addEventListener('click', e=>{ state.machinery.splice(+e.target.dataset.i,1); renderForm(); update(); }));
+  document.querySelectorAll('.m-desc').forEach(el=>el.addEventListener('input', e=>{ state.machinery[+e.target.dataset.i].desc=e.target.value; update(); }));
+  document.querySelectorAll('.m-qty').forEach(el=>el.addEventListener('input', e=>{ state.machinery[+e.target.dataset.i].qty=+e.target.value||0; update(); }));
+  document.querySelectorAll('.m-rate').forEach(el=>el.addEventListener('input', e=>{ state.machinery[+e.target.dataset.i].rate=+e.target.value||0; update(); }));
+
+  byId('addWage').addEventListener('click', ()=>{ state.wages.push({role:"",count:1,monthly:0}); renderForm(); update(); });
+  document.querySelectorAll('.w-del').forEach(b=>b.addEventListener('click', e=>{ state.wages.splice(+e.target.dataset.i,1); renderForm(); update(); }));
+  document.querySelectorAll('.w-role').forEach(el=>el.addEventListener('input', e=>{ state.wages[+e.target.dataset.i].role=e.target.value; update(); }));
+  document.querySelectorAll('.w-count').forEach(el=>el.addEventListener('input', e=>{ state.wages[+e.target.dataset.i].count=+e.target.value||0; update(); }));
+  document.querySelectorAll('.w-monthly').forEach(el=>el.addEventListener('input', e=>{ state.wages[+e.target.dataset.i].monthly=+e.target.value||0; update(); }));
+
+  byId('addSalary').addEventListener('click', ()=>{ state.salary.push({role:"",count:1,monthly:0}); renderForm(); update(); });
+  document.querySelectorAll('.s-del').forEach(b=>b.addEventListener('click', e=>{ state.salary.splice(+e.target.dataset.i,1); renderForm(); update(); }));
+  document.querySelectorAll('.s-role').forEach(el=>el.addEventListener('input', e=>{ state.salary[+e.target.dataset.i].role=e.target.value; update(); }));
+  document.querySelectorAll('.s-count').forEach(el=>el.addEventListener('input', e=>{ state.salary[+e.target.dataset.i].count=+e.target.value||0; update(); }));
+  document.querySelectorAll('.s-monthly').forEach(el=>el.addEventListener('input', e=>{ state.salary[+e.target.dataset.i].monthly=+e.target.value||0; update(); }));
+}
+
+function setPath(path, value){
+  const parts = path.split('.');
+  let obj = state;
+  for(let i=0;i<parts.length-1;i++) obj = obj[parts[i]];
+  obj[parts[parts.length-1]] = value;
+}
+
+/* =========================================================================
+   PREVIEW RENDERING — mirrors the 8 logical pages of the reference report
+   ========================================================================= */
+const previewpane = document.getElementById('previewpane');
+
+/* =========================================================================
+   NARRATIVE REPORT — Introduction / Promoter Profile / Market Analysis / SWOT,
+   built entirely from the same inputs and computed figures as the financial
+   pages. No fixed names, locations, or sample figures are hard-coded here —
+   every sentence is assembled from `state` and `c` (computeAll output).
+   ========================================================================= */
+function buildNarrativePages(c){
+  const n = c.n;
+  const businessName = state.projectName || state.product || "the proposed unit";
+  const activity = state.product || state.projectName || "its core business activity";
+  const promoter = state.name || "the promoter";
+  const constitutionLower = (state.constitution||"enterprise").toLowerCase();
+  const location = (state.unitAddress || state.address || "").replace(/\n/g,", ").trim();
+  const locationShort = location.split(",").slice(-2).join(",").trim();
+  const employmentCount = +state.employment||0;
+  const rawMatDesc = state.rawMaterialsDesc || "raw materials";
+  const machineryList = state.machinery.filter(m=>m.desc).map(m=>m.desc).join(", ");
+  const workshedOwned = state.workshed.owned;
+  const ownPctOfTotal = c.totalCost ? c.ownContribution/c.totalCost : 0;
+  const workforce = [
+    ...state.salary.filter(w=>w.role && (+w.count||0)>0).map(w=>({...w, group:'Administrative'})),
+    ...state.wages.filter(w=>w.role && (+w.count||0)>0).map(w=>({...w, group:'Production'}))
+  ];
+
+  // ---- Cover ----
+  const cover = `
+  <div class="page" data-pageno="">
+    <div style="text-align:center;margin-top:54px">
+      <div style="font-family:var(--mono);letter-spacing:.22em;font-size:11px;color:var(--brass)">DETAILED PROJECT REPORT</div>
+      <div style="font-family:var(--serif);font-weight:700;font-size:28px;color:var(--navy);margin-top:14px">${businessName||"&mdash;"}</div>
+      <div style="font-size:13.5px;color:#6a6353;margin-top:6px">${activity}${state.rawMaterialsDesc?` &middot; ${rawMatDesc}`:""}</div>
+      <div style="margin-top:38px;font-size:12.5px;color:#8a8270">Promoted by</div>
+      <div style="font-family:var(--serif);font-weight:600;font-size:17px;margin-top:2px">${promoter||"&mdash;"}</div>
+      <div style="font-size:11.5px;color:#6a6353;margin-top:6px;line-height:1.6">${location||"&mdash;"}${state.phone?`<br>Phone: ${state.phone}`:""}</div>
+    </div>
+    <table class="rpt" style="margin-top:48px"><tbody>
+      <tr><td class="lbl" style="width:30%">Project Cost</td><td style="width:20%">${inr(c.totalCost)}</td><td class="lbl" style="width:30%">Term Loan</td><td style="width:20%">${inr(c.termLoanPrincipal)}</td></tr>
+      <tr><td class="lbl">Working Capital Loan</td><td>${inr(c.wcLoanPrincipal)}</td><td class="lbl">Own Contribution</td><td>${inr(c.ownContribution)}</td></tr>
+      <tr><td class="lbl">DSCR (Year 1)</td><td>${c.dscr[0].toFixed(2)}</td><td class="lbl">Break-Even Point (Year 1)</td><td>${pct(c.breakEven[0].bepPct)}</td></tr>
+      <tr><td class="lbl">Annual Turnover (100%)</td><td>${inr(c.salesAt100)}</td><td class="lbl">Net Profit (Year 1)</td><td>${inr(c.netProfit[0])}</td></tr>
+      <tr><td class="lbl">Employment Generated</td><td colspan="3">${employmentCount} ${employmentCount===1?"Person":"Persons"}</td></tr>
+    </tbody></table>
+    <div style="text-align:center;margin-top:42px;font-size:11px;color:#8a8270">${locationShort}${state.date?` | Date: ${state.date}`:""}</div>
+  </div>`;
+
+  // ---- Page: Introduction ----
+  const introPara = `This Detailed Project Report has been prepared for the establishment of &ldquo;${businessName||"the proposed unit"}&rdquo;, a ${constitutionLower} proposed to be set up at ${location||"the proposed location"}, promoted by ${promoter}. The unit will be engaged in ${activity}${state.rawMaterialsDesc?`, using ${rawMatDesc} as a principal input`:""}, serving customers within its target market. The total project cost is estimated at ${inr(c.totalCost)}, comprising a term loan of ${inr(c.termLoanPrincipal)}, a working capital loan of ${inr(c.wcLoanPrincipal)}, and an own contribution of ${inr(c.ownContribution)} (${pct(ownPctOfTotal)} of the project cost). At full capacity, the unit is projected to achieve an annual turnover of ${inr(c.salesAt100)}, a Year 1 net profit of ${inr(c.netProfit[0])}, a Debt Service Coverage Ratio of ${c.dscr[0].toFixed(2)}, and a Break-Even Point of ${pct(c.breakEven[0].bepPct)}.`;
+
+  const objectives = [
+    `To establish ${businessName||"the unit"} at ${location||"the proposed location"}.`,
+    `To provide ${activity} to customers within its market area.`,
+    `To generate self-employment for the promoter${employmentCount?` and direct employment for ${employmentCount} ${employmentCount===1?"person":"persons"}`:""}.`,
+    `To build a financially sound enterprise with turnover growing from ${inr(c.sales[0])} in Year 1 to ${inr(c.sales[n-1])} in Year ${n}.`,
+    `To utilise available government self-employment scheme support to establish a productive, independent business.`
+  ];
+
+  const highlightsRows = [
+    ["Business Name", businessName||"&mdash;"],
+    ["Activity", activity||"&mdash;"],
+    ["Location", location||"&mdash;"],
+    ["Constitution", state.constitution],
+    ["Total Project Cost", inr(c.totalCost)],
+    ["Term Loan", `${inr(c.termLoanPrincipal)} @ ${state.termLoanRate}% p.a.`],
+    ["Working Capital Loan", `${inr(c.wcLoanPrincipal)} @ ${state.wcLoanRate}% p.a.`],
+    ["Own Contribution", `${inr(c.ownContribution)} (${pct(ownPctOfTotal)} of project cost)`],
+    ["Key Machinery", machineryList||"&mdash;"],
+    ["Raw Material", rawMatDesc],
+    ["Annual Sales (100%)", inr(c.salesAt100)],
+    ["Net Profit (Year 1)", inr(c.netProfit[0])],
+    ["DSCR (Year 1)", c.dscr[0].toFixed(2)],
+    ["BEP (Year 1)", pct(c.breakEven[0].bepPct)],
+    ["Net Profit Ratio (Year 1)", pct(c.netProfitRatio[0])],
+    ["Employment", `${employmentCount} ${employmentCount===1?"Person":"Persons"}`],
+    ["Workshed", workshedOwned?"Owned (no rental burden)":"Rented"],
+    ["Implementation Period", `${state.implMonths} Months`]
+  ];
+
+  const page1 = `
+  <div class="page" data-pageno="">
+    <div class="sec-h" style="font-size:15px"><span class="num">1</span>Introduction</div>
+    <p style="font-size:12.5px;line-height:1.65;margin:0 0 14px">${introPara}</p>
+    <div class="sec-h" style="font-size:12.5px"><span class="num">1.1</span>Objectives of the Project</div>
+    <ul style="font-size:12.5px;line-height:1.75;margin:0 0 14px;padding-left:18px">${objectives.map(o=>`<li>${o}</li>`).join("")}</ul>
+    <div class="sec-h" style="font-size:12.5px"><span class="num">1.2</span>Project Highlights</div>
+    <table class="rpt"><tbody>${highlightsRows.map(([k,v])=>`<tr><td class="lbl" style="width:38%">${k}</td><td>${v}</td></tr>`).join("")}</tbody></table>
+    <div class="sec-h" style="font-size:12.5px"><span class="num">1.3</span>Scope of the Report</div>
+    <p style="font-size:12.5px;line-height:1.65;margin:0">This report covers the promoter's background, market potential and demand assessment, technical details of the enterprise, and a ${n}-year financial projection comprising Profit &amp; Loss Account, Balance Sheet, Cash Flow Statement, DSCR, and Break-Even Analysis. It is prepared to support loan appraisal by the financing bank and the concerned government agency.</p>
+  </div>`;
+
+  // ---- Page: About the Promoter ----
+  const promoterPara = `${businessName||"The unit"} is promoted by ${promoter}, proposed to be based at ${location||"the proposed location"}. The promoter has structured this venture with careful financial planning, contributing ${inr(c.ownContribution)} (${pct(ownPctOfTotal)} of the total project cost) from own resources${workshedOwned?", and operates from an owned workshed, removing rental overhead from the cost structure":""}.`;
+
+  const profileRows = [
+    ["Name of Promoter", promoter||"&mdash;"],
+    ["Constitution", state.constitution],
+    ["Business Name", businessName||"&mdash;"],
+    ["Address", location||"&mdash;"],
+    ["Phone Number", state.phone||"&mdash;"],
+    ["Business Activity", activity||"&mdash;"],
+    ["Own Contribution", `${inr(c.ownContribution)} (${pct(ownPctOfTotal)} of project cost)`],
+    ["Land &amp; Workshed", workshedOwned?"Owned — no rental cost":"Rented"]
+  ];
+
+  const strengths = [];
+  if(machineryList) strengths.push(`Direct familiarity with the operation of key equipment — ${machineryList} — required to run the unit effectively.`);
+  if(workshedOwned) strengths.push(`Ownership of workshed eliminates monthly rental expenditure, providing a structural cost advantage and reducing fixed overhead.`);
+  strengths.push(`Personal financial commitment of ${inr(c.ownContribution)} (${pct(ownPctOfTotal)} of total project cost) from own savings, demonstrating confidence in the business plan.`);
+  if(c.dscr[0]>=1.5) strengths.push(`Strong projected debt-servicing capacity, with a Year 1 Debt Service Coverage Ratio of ${c.dscr[0].toFixed(2)}.`);
+  if(c.breakEven[0].bepPct<=0.5 && c.breakEven[0].bepPct>0) strengths.push(`A relatively low break-even threshold of ${pct(c.breakEven[0].bepPct)}, allowing the unit to remain viable even at moderate capacity utilisation.`);
+  strengths.push(`Direct involvement in day-to-day operations, supporting consistent quality control and customer relationships.`);
+
+  const opsTableRows = [["Promoter (Owner-Manager)", 1, "Self-employed"]]
+    .concat(workforce.map(w=>[w.role, w.count, inr(+w.monthly||0)]));
+
+  const phaseMonths = Math.max(1, Math.round((+state.implMonths||3)/3));
+  const implementationRows = [
+    [1, `Month 1 to ${phaseMonths}`, `Loan sanction and procurement of ${machineryList||"required machinery"}.`],
+    [2, `Month ${phaseMonths+1} to ${phaseMonths*2}`, `Machine installation${workshedOwned?" in owned workshed":""}, procurement of working stock, recruitment of workforce.`],
+    [3, `Month ${phaseMonths*2+1} to ${state.implMonths}`, `Trial run, client outreach, and commercial launch.`]
+  ];
+
+  const page2 = `
+  <div class="page" data-pageno="">
+    <div class="sec-h" style="font-size:15px"><span class="num">2</span>About the Promoter</div>
+    <p style="font-size:12.5px;line-height:1.65;margin:0 0 14px">${promoterPara}</p>
+    <div class="sec-h" style="font-size:12.5px"><span class="num">2.1</span>Promoter Profile</div>
+    <table class="rpt"><tbody>${profileRows.map(([k,v])=>`<tr><td class="lbl" style="width:38%">${k}</td><td>${v}</td></tr>`).join("")}</tbody></table>
+    <div class="sec-h" style="font-size:12.5px"><span class="num">2.2</span>Entrepreneurial Strengths</div>
+    <ul style="font-size:12.5px;line-height:1.75;margin:0 0 14px;padding-left:18px">${strengths.map(s=>`<li>${s}</li>`).join("")}</ul>
+    <div class="sec-h" style="font-size:12.5px"><span class="num">2.3</span>Proposed Operations &amp; Workforce</div>
+    <table class="rpt"><thead><tr><th class="lbl">Role</th><th>No. of Persons</th><th>Monthly Wages</th></tr></thead>
+      <tbody>${opsTableRows.map(([role,count,wage])=>`<tr><td class="lbl">${role}</td><td>${count}</td><td>${wage}</td></tr>`).join("")}</tbody></table>
+    <div class="sec-h" style="font-size:12.5px"><span class="num">2.4</span>Implementation Plan</div>
+    <table class="rpt"><thead><tr><th class="lbl">Phase</th><th>Duration</th><th class="lbl">Activities</th></tr></thead>
+      <tbody>${implementationRows.map(([p,d,a])=>`<tr><td class="lbl">${p}</td><td>${d}</td><td class="lbl">${a}</td></tr>`).join("")}</tbody></table>
+  </div>`;
+
+  // ---- Page: Market Analysis ----
+  const industryPara = `The sector covering ${activity||"this business activity"} is an important segment of the local micro-enterprise economy, offering steady demand from individual customers and institutional buyers alike. Units engaged in ${activity||"this activity"} that combine reliable quality, competitive pricing, and consistent service delivery are typically well placed to build a stable client base and repeat business.`;
+  const localMarketPara = `${location?`The proposed location at ${location} `:"The proposed location "}offers reasonable access to the surrounding market for ${activity||"the unit's products and services"}. Proximity to nearby commercial centres and residential demand supports steady customer acquisition, while local supply chains can be leveraged for procurement of ${rawMatDesc}.`;
+
+  const demandRows = c.years.map(i=>[`Year ${i+1}`, `${state.capacityUtil[i]||0}%`, inr(c.sales[i]), inr(c.netProfit[i])]);
+
+  const competitiveRows = [
+    ["Competition", "Assessed against other local providers of similar products/services in the immediate market area."],
+    ["Pricing", `${state.ratePerUnit?`Rs. ${inrPlain(state.ratePerUnit)} per unit is positioned to be competitive for the local market.`:"To be benchmarked against prevailing local rates."}`],
+    ["Cost Advantage", workshedOwned?"Owned workshed removes rental overhead, supporting competitive pricing while preserving margins.":"Operating cost structure to be optimised as the unit scales."],
+    ["Quality / Differentiation", machineryList?`Use of ${machineryList} is expected to support consistent quality and turnaround.`:"Consistent quality and timely delivery form the core differentiator."]
+  ];
+
+  const swotStrengths = [];
+  if(c.dscr[0]>=1.5) swotStrengths.push(`Healthy DSCR of ${c.dscr[0].toFixed(2)} in Year 1`);
+  if(c.breakEven[0].bepPct>0 && c.breakEven[0].bepPct<=0.5) swotStrengths.push(`Low Break-Even Point of ${pct(c.breakEven[0].bepPct)}`);
+  if(workshedOwned) swotStrengths.push("Owned workshed — zero rental cost");
+  if(ownPctOfTotal>=0.2) swotStrengths.push(`${pct(ownPctOfTotal)} own contribution shows financial commitment`);
+  if(!swotStrengths.length) swotStrengths.push("Clear financial structuring across own contribution and bank finance");
+
+  const swotWeaknesses = [];
+  if(employmentCount<=1) swotWeaknesses.push("Limited workforce — operational dependency on few individuals");
+  if(c.netProfitRatio[0]>0 && c.netProfitRatio[0]<0.15) swotWeaknesses.push(`Net Profit Ratio of ${pct(c.netProfitRatio[0])} in Year 1 is moderate`);
+  swotWeaknesses.push("New brand with no established order pipeline at inception");
+  if(c.wcLoanPrincipal>c.termLoanPrincipal) swotWeaknesses.push("Working capital loan relatively high compared to term loan");
+
+  const swotOpportunities = [
+    `Scope to scale turnover from ${inr(c.sales[0])} in Year 1 to ${inr(c.sales[n-1])} in Year ${n}`,
+    "Potential to expand client base through referrals and repeat business",
+    "Possibility of adding capacity, machinery, or workforce as demand grows",
+    "Access to government self-employment scheme support and priority lending"
+  ];
+
+  const swotThreats = [
+    "Input cost inflation affecting raw material and operating expenses",
+    "Competition from existing local providers",
+    "Seasonal or cyclical fluctuations in demand",
+    "Key-person or skilled-worker dependency risk"
+  ];
+
+  const swotGrid = (title, items)=>`<div><div style="font-weight:700;font-size:11.5px;color:var(--navy);margin-bottom:4px">${title}</div><ul style="font-size:11.5px;line-height:1.6;margin:0;padding-left:16px">${items.map(i=>`<li>${i}</li>`).join("")}</ul></div>`;
+
+  const marketingBullets = [
+    `Direct outreach to potential clients and businesses in and around ${locationShort||"the local area"} to build a regular order base.`,
+    "Word-of-mouth marketing through consistent quality and timely delivery — typically the primary channel for micro-enterprises of this kind.",
+    "Use of digital channels (WhatsApp Business, local social media groups) to manage client communication and showcase work.",
+    "Collaborative arrangements with allied local businesses and self-help groups where relevant to the activity."
+  ];
+
+  const pricingPara = state.ratePerUnit ? `The unit will price its output at approximately Rs. ${inrPlain(state.ratePerUnit)} per unit.${state.rawMaterials?` Raw material cost at 100% capacity is ${inr(state.rawMaterials)} against gross revenue of ${inr(c.salesAt100)}${c.salesAt100?` — a material cost ratio of ${pct(state.rawMaterials/c.salesAt100)}`:""}.` : ""} The Break-Even Point of ${pct(c.breakEven[0].bepPct)} in Year 1 indicates the unit's ability to cover its costs comfortably even at moderate utilisation levels.` : `Pricing will be benchmarked against prevailing local market rates for ${activity||"comparable products/services"}, with the Break-Even Point of ${pct(c.breakEven[0].bepPct)} in Year 1 indicating the cost coverage achievable even at moderate utilisation.`;
+
+  const page3 = `
+  <div class="page" data-pageno="">
+    <div class="sec-h" style="font-size:15px"><span class="num">3</span>Market Analysis</div>
+    <p style="font-size:12.5px;line-height:1.65;margin:0 0 10px">A focused market assessment supports the commercial viability of ${businessName||"the proposed unit"}, covering the broader industry context, the local market, demand estimation, competitive positioning, and the marketing approach to be adopted.</p>
+    <div class="sec-h" style="font-size:12.5px"><span class="num">3.1</span>Industry Overview</div>
+    <p style="font-size:12.5px;line-height:1.65;margin:0 0 12px">${industryPara}</p>
+    <div class="sec-h" style="font-size:12.5px"><span class="num">3.2</span>Local Market</div>
+    <p style="font-size:12.5px;line-height:1.65;margin:0 0 12px">${localMarketPara}</p>
+    <div class="sec-h" style="font-size:12.5px"><span class="num">3.3</span>Demand Assessment</div>
+    <table class="rpt"><thead><tr><th class="lbl">Year</th><th>Capacity</th><th>Revenue (Rs.)</th><th>Net Profit (Rs.)</th></tr></thead>
+      <tbody>${demandRows.map(([y,cap,rev,np])=>`<tr><td class="lbl">${y}</td><td>${cap}</td><td>${rev}</td><td>${np}</td></tr>`).join("")}</tbody></table>
+    <div class="sec-h" style="font-size:12.5px"><span class="num">3.4</span>Competitive Landscape</div>
+    <table class="rpt"><thead><tr><th class="lbl">Factor</th><th class="lbl">Assessment</th></tr></thead>
+      <tbody>${competitiveRows.map(([f,a])=>`<tr><td class="lbl">${f}</td><td class="lbl">${a}</td></tr>`).join("")}</tbody></table>
+    <div class="sec-h" style="font-size:12.5px"><span class="num">3.5</span>SWOT Analysis</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:12px">
+      ${swotGrid("Strengths", swotStrengths)}
+      ${swotGrid("Weaknesses", swotWeaknesses)}
+      ${swotGrid("Opportunities", swotOpportunities)}
+      ${swotGrid("Threats", swotThreats)}
+    </div>
+    <div class="sec-h" style="font-size:12.5px"><span class="num">3.6</span>Marketing Strategy</div>
+    <ul style="font-size:12.5px;line-height:1.75;margin:0 0 12px;padding-left:18px">${marketingBullets.map(b=>`<li>${b}</li>`).join("")}</ul>
+    <div class="sec-h" style="font-size:12.5px"><span class="num">3.7</span>Pricing &amp; Revenue Model</div>
+    <p style="font-size:12.5px;line-height:1.65;margin:0">${pricingPara}</p>
+  </div>`;
+
+  return cover+page1+page2+page3;
+}
+
+function renderPreview(c){
+  const n = c.n;
+  const heads = yearHeads(n);
+  const thYears = heads.map(h=>`<th>${h}</th>`).join("");
+
+  // ---- Page 1: Top sheet ----
+  const page1 = `
+  <div class="page" data-pageno="Page 1 of 8">
+    <div class="rpt-title">Project at a Glance — Top Sheet</div>
+    <div class="rpt-sub">Detailed Project Report</div>
+    <div class="glance-row"><span class="glance-num">1</span><span class="gk">Name of the Entrepreneur</span><span class="gv">${state.name}</span></div>
+    <div class="glance-row"><span class="glance-num">2</span><span class="gk">Constitution (Legal Status)</span><span class="gv">${state.constitution}</span></div>
+    <div class="glance-row"><span class="glance-num">3</span><span class="gk">Phone Number</span><span class="gv">${state.phone}</span></div>
+    <div class="glance-row"><span class="glance-num">4</span><span class="gk">Address</span><span class="gv">${state.address.replace(/\n/g,", ")}</span></div>
+    <div class="glance-row"><span class="glance-num">5</span><span class="gk">Product and By-Product</span><span class="gv">${state.product}<br><span style="font-size:11px;color:#8a8270">${state.unitAddress}</span></span></div>
+    <div class="glance-row"><span class="glance-num">6</span><span class="gk">Cost of Project / Business Activity</span><span class="gv">${inr(c.totalCost)}<br><span style="font-size:11px;color:#8a8270">${state.projectName}</span></span></div>
+    <div class="glance-row"><span class="glance-num">7</span><span class="gk">Means of Finance</span>
+      <span class="gv">Term Loan ${inr(c.termLoanPrincipal)}<br>Working Capital Loan ${inr(c.wcLoanPrincipal)}<br>Own Capital ${inr(c.ownContribution)}</span></div>
+    <div class="glance-row"><span class="glance-num">8</span><span class="gk">Debt Service Coverage Ratio</span><span class="gv">${c.dscr[0].toFixed(2)}</span></div>
+    <div class="glance-row"><span class="glance-num">9</span><span class="gk">Pay Back Period</span><span class="gv">${n} Years</span></div>
+    <div class="glance-row"><span class="glance-num">10</span><span class="gk">Project Implementation</span><span class="gv">${state.implMonths} Months</span></div>
+    <div class="glance-row"><span class="glance-num">11</span><span class="gk">Break Even Point</span><span class="gv">${pct(c.breakEven[0].bepPct)}</span></div>
+    <div class="glance-row"><span class="glance-num">12</span><span class="gk">Employment</span><span class="gv">${state.employment}</span></div>
+    <div class="glance-row"><span class="glance-num">13</span><span class="gk">Power Requirement</span><span class="gv">${state.power} kW</span></div>
+    <div class="glance-row"><span class="glance-num">14</span><span class="gk">Major Raw Materials</span><span class="gv">${state.rawMaterialsDesc}</span></div>
+    <div class="glance-row"><span class="glance-num">15</span><span class="gk">Estimated Annual Sales Turnover</span><span class="gv">${inr(c.salesAt100)}</span></div>
+  </div>`;
+
+  // ---- Page 2: Cost of project ----
+  const page2 = `
+  <div class="page" data-pageno="Page 2 of 8">
+    <div class="sec-h"><span class="num">1</span>Cost of Project</div>
+    <div class="sec-h" style="border:none;font-size:12.5px;margin-top:0"><span class="num">A.</span>Fixed Capital Investment</div>
+    <div class="kv"><div class="k">a. Land</div><div class="v">${state.land.owned?"Owned":inr(c.landAmt)}</div></div>
+    <div class="kv"><div class="k">b. Workshed</div><div class="v">${state.workshed.owned?"Owned":inr(c.workshedAmt)}</div></div>
+    <div class="sec-h" style="border:none;font-size:12.5px"><span class="num">C.</span>Machinery</div>
+    <table class="rpt"><thead><tr><th class="lbl">Particulars</th><th>Qty.</th><th>Rate</th><th>Amount (Rs.)</th></tr></thead>
+      <tbody>${c.machineryRows.map(m=>`<tr><td class="lbl">${m.desc}</td><td>${m.qty}</td><td>${inrPlain(m.rate)}</td><td>${inrPlain(m.amount)}</td></tr>`).join("")}
+      <tr class="total"><td class="lbl" colspan="3">Total</td><td>${inrPlain(c.machineryTotal)}</td></tr></tbody></table>
+    <div class="kv"><div class="k">d. Preliminary &amp; Pre-operative Cost</div><div class="v">${inr(state.prelim)}</div></div>
+    <div class="kv"><div class="k">e. Furniture &amp; Fixtures</div><div class="v">${inr(state.furniture)}</div></div>
+    <div class="kv"><div class="k">f. Electrification</div><div class="v">${inr(state.electrification)}</div></div>
+    <div class="kv" style="font-weight:700;border-top:1px solid var(--line);padding-top:6px;"><div class="k">Total Capital Expenditure</div><div class="v">${inr(c.capex)}</div></div>
+    <div class="kv"><div class="k">Working Capital</div><div class="v">${inr(c.wc)}</div></div>
+    <div class="kv" style="font-weight:700"><div class="k">Total Cost of Project</div><div class="v">${inr(c.totalCost)}</div></div>
+    <div class="sec-h">Means of Financing</div>
+    <div class="kv"><div class="k">Own Contribution</div><div class="v">${inr(c.ownContribution)}</div></div>
+    <div class="kv"><div class="k">Bank Finance — Term Loan</div><div class="v">${inr(c.termLoanPrincipal)}</div></div>
+    <div class="kv"><div class="k">Bank Finance — Working Capital</div><div class="v">${inr(c.wcLoanPrincipal)}</div></div>
+    <div class="kv" style="font-weight:700"><div class="k">Total Bank Finance</div><div class="v">${inr(c.bankFinanceTotal)}</div></div>
+    <div class="note-box">Subsidy (informational, ${state.subsidyPct}% of project cost): ${inr(c.subsidy)} — to be transferred from the sanctioning authority.</div>
+  </div>`;
+
+  // ---- Page 3: Loan repayment & depreciation ----
+  const loanTbl = (title, rows, rate, showHead) => `
+    ${showHead===false ? '' : `<div class="sec-h" style="font-size:12.5px">${title} <span style="float:right;font-family:var(--mono);font-weight:400;color:#8a8270">@ ${rate}%</span></div>`}
+    <table class="rpt"><thead><tr><th class="lbl">Year</th><th>Opening Balance</th><th>Installment</th><th>Closing Balance</th><th>Interest</th></tr></thead>
+    <tbody>${rows.map((r,i)=>`<tr><td class="lbl">${heads[i]}</td><td>${inrPlain(r.opening)}</td><td>${inrPlain(r.installment)}</td><td>${inrPlain(r.closing)}</td><td>${inrPlain(r.interest)}</td></tr>`).join("")}</tbody></table>`;
+  const depTbl = (title, rows, rate) => `
+    <div class="sec-h" style="font-size:12.5px">${title} <span style="float:right;font-family:var(--mono);font-weight:400;color:#8a8270">@ ${rate}%</span></div>
+    <table class="rpt"><thead><tr><th class="lbl">Particulars</th>${thYears}</tr></thead>
+    <tbody>
+      <tr><td class="lbl">Opening Balance</td>${rows.map(r=>`<td>${inrPlain(r.opening)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Depreciation</td>${rows.map(r=>`<td>${inrPlain(r.dep)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Closing Balance</td>${rows.map(r=>`<td>${inrPlain(r.closing)}</td>`).join("")}</tr>
+    </tbody></table>`;
+  const page3 = `
+  <div class="page" data-pageno="Page 3 of 8">
+    <div class="sec-h"><span class="num">3.1</span>Repayment of Term Loan &amp; Working Capital Loan</div>
+    ${loanTbl("Term Loan", c.termLoanRows, state.termLoanRate)}
+    <div class="sec-h"><span class="num">3.2</span>Working Capital Loan <span style="float:right;font-family:var(--mono);font-weight:400;font-size:11px;color:#8a8270">@ ${state.wcLoanRate}%</span></div>
+    ${loanTbl("", c.wcLoanRows, state.wcLoanRate, false)}
+    <div class="sec-h"><span class="num">3.3</span>Depreciation on Fixed Assets</div>
+    ${depTbl("Workshed", c.workshedDep, state.workshedDepPct)}
+    ${depTbl("Machinery", c.machineryDep, state.machineryDepPct)}
+    <div class="sec-h" style="font-size:12.5px">Total Depreciation</div>
+    <table class="rpt"><thead><tr><th class="lbl">Particulars</th>${thYears}</tr></thead>
+      <tbody>
+        <tr><td class="lbl">Workshed</td>${c.workshedDep.map(r=>`<td>${inrPlain(r.dep)}</td>`).join("")}</tr>
+        <tr><td class="lbl">Machinery</td>${c.machineryDep.map(r=>`<td>${inrPlain(r.dep)}</td>`).join("")}</tr>
+        <tr class="total"><td class="lbl">Total</td>${c.totalDep.map(d=>`<td>${inrPlain(d)}</td>`).join("")}</tr>
+      </tbody></table>
+  </div>`;
+
+  // ---- Page 4: Sales & direct costs ----
+  const page4 = `
+  <div class="page" data-pageno="Page 4 of 8">
+    <div class="sec-h"><span class="num">4</span>Schedule of Sales Realization</div>
+    <div class="sec-h" style="font-size:12.5px"><span class="num">4.1</span>Details of Sales</div>
+    <table class="rpt"><thead><tr><th class="lbl">Particulars</th><th>Rate/Unit</th><th>No. of Units</th><th>Amount (Rs.)</th></tr></thead>
+      <tbody><tr><td class="lbl">Receipts from Sale / Services</td><td>${inrPlain(state.ratePerUnit)}</td><td>${state.unitsAt100}</td><td>${inrPlain(c.salesAt100)}</td></tr>
+      <tr class="total"><td class="lbl" colspan="3">Total</td><td>${inrPlain(c.salesAt100)}</td></tr></tbody></table>
+    <div class="sec-h" style="font-size:12.5px"><span class="num">4.2</span>Capacity Utilization of Sales</div>
+    <table class="rpt"><thead><tr><th class="lbl">Particulars</th>${thYears}</tr></thead>
+      <tbody><tr><td class="lbl">Capacity Utilization</td>${state.capacityUtil.map(x=>`<td>${x}%</td>`).join("")}</tr>
+      <tr><td class="lbl">Sales / Receipts</td>${c.sales.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr></tbody></table>
+
+    <div class="sec-h"><span class="num">5</span>Raw Materials</div>
+    <table class="rpt"><thead><tr><th class="lbl">Particulars</th><th>Amount (Rs.)</th></tr></thead>
+      <tbody><tr><td class="lbl">${state.rawMaterialsDesc}</td><td>${inrPlain(state.rawMaterials)}</td></tr></tbody></table>
+    <div class="sec-h" style="font-size:12.5px"><span class="num">5.1</span>Wages</div>
+    <table class="rpt"><thead><tr><th class="lbl">Particulars</th><th>No.</th><th>Wages/Month</th><th>Amount (Per Annum)</th></tr></thead>
+      <tbody>${state.wages.map(w=>`<tr><td class="lbl">${w.role}</td><td>${w.count}</td><td>${inrPlain(w.monthly)}</td><td>${inrPlain(w.count*w.monthly*12)}</td></tr>`).join("")}
+      <tr class="total"><td class="lbl" colspan="3">Total</td><td>${inrPlain(state.wages.reduce((a,w)=>a+w.count*w.monthly*12,0))}</td></tr></tbody></table>
+    <div class="kv"><div class="k"><span class="num" style="color:var(--brass)">5.2</span> Repairs and Maintenance</div><div class="v">${inr(state.repairs)}</div></div>
+    <div class="kv"><div class="k"><span class="num" style="color:var(--brass)">5.3</span> Power</div><div class="v">${inr(state.power_cost)}</div></div>
+    <div class="kv"><div class="k"><span class="num" style="color:var(--brass)">5.4</span> Transportation</div><div class="v">${inr(state.transportation)}</div></div>
+  </div>`;
+
+  // ---- Page 5: Admin expenses & capacity table ----
+  const page5 = `
+  <div class="page" data-pageno="Page 5 of 8">
+    <div class="sec-h"><span class="num">6.1</span>Administrative Expenses — Salary</div>
+    <table class="rpt"><thead><tr><th class="lbl">Particulars</th><th>No.</th><th>Per Month</th><th>Amount (Per Annum)</th></tr></thead>
+      <tbody>${state.salary.map(w=>`<tr><td class="lbl">${w.role}</td><td>${w.count}</td><td>${inrPlain(w.monthly)}</td><td>${inrPlain(w.count*w.monthly*12)}</td></tr>`).join("")}
+      <tr class="total"><td class="lbl" colspan="3">Total</td><td>${inrPlain(state.salary.reduce((a,w)=>a+w.count*w.monthly*12,0))}</td></tr></tbody></table>
+    <div class="kv"><div class="k"><span class="num" style="color:var(--brass)">6.2</span> Telephone Expenses</div><div class="v">${inr(state.telephone)}</div></div>
+    <div class="kv"><div class="k"><span class="num" style="color:var(--brass)">6.3</span> Stationery &amp; Postage</div><div class="v">${inr(state.stationery)}</div></div>
+    <div class="kv"><div class="k"><span class="num" style="color:var(--brass)">6.4</span> Advertisement &amp; Publicity</div><div class="v">${inr(state.advertisement)}</div></div>
+    <div class="kv"><div class="k"><span class="num" style="color:var(--brass)">6.5</span> Workshed Rent</div><div class="v">${inr(state.workshedRent)}</div></div>
+    <div class="kv"><div class="k"><span class="num" style="color:var(--brass)">6.6</span> Other Miscellaneous Expenses</div><div class="v">${inr(state.otherMisc)}</div></div>
+
+    <div class="sec-h"><span class="num">7.1</span>Capacity Utilization of Manufacturing &amp; Administrative Expenses</div>
+    <table class="rpt"><thead><tr><th class="lbl">Particulars</th>${thYears}</tr></thead>
+      <tbody><tr><td class="lbl">Capacity Utilization</td>${state.capacityUtil.map(x=>`<td>${x}%</td>`).join("")}</tr></tbody></table>
+    <div class="sec-h" style="font-size:12.5px"><span class="num">7.2</span>Manufacturing Expenses</div>
+    <table class="rpt"><thead><tr><th class="lbl">Particulars</th>${thYears}</tr></thead><tbody>
+      <tr><td class="lbl">Raw Materials</td>${c.rawMaterials.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Wages</td>${c.wages.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Repairs &amp; Maintenance</td>${c.repairs.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Power &amp; Fuel</td>${c.power.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Transportation</td>${c.transport.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
+    </tbody></table>
+    <div class="sec-h" style="font-size:12.5px"><span class="num">7.3</span>Administrative Expenses</div>
+    <table class="rpt"><thead><tr><th class="lbl">Particulars</th>${thYears}</tr></thead><tbody>
+      <tr><td class="lbl">Salary</td>${c.salary.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Telephone</td>${c.telephone.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Stationery &amp; Postage</td>${c.stationery.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Advertisement &amp; Publicity</td>${c.advertisement.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Workshed Rent</td>${c.workshedRent.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Other Miscellaneous</td>${c.otherMisc.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
+      <tr class="total"><td class="lbl">Total</td>${c.years.map(i=>`<td>${inrPlain(c.productionCost[i]-c.totalDep[i]+c.adminCost[i])}</td>`).join("")}</tr>
+    </tbody></table>
+  </div>`;
+
+  // ---- Page 6: WC assessment & P&L ----
+  const page6 = `
+  <div class="page" data-pageno="Page 6 of 8">
+    <div class="sec-h"><span class="num">8</span>Assessment of Working Capital</div>
+    <table class="rpt"><thead><tr><th class="lbl">Particulars</th><th>Amount (Rs.)</th></tr></thead><tbody>
+      <tr><td class="lbl">Sale</td><td>${inrPlain(c.salesAt100)}</td></tr>
+      <tr><td class="lbl">Raw Material</td><td>${inrPlain(state.rawMaterials)}</td></tr>
+      <tr><td class="lbl">Wages</td><td>${inrPlain(state.wages.reduce((a,w)=>a+w.count*w.monthly*12,0))}</td></tr>
+      <tr><td class="lbl">Repairs &amp; Maintenance</td><td>${inrPlain(state.repairs)}</td></tr>
+      <tr><td class="lbl">Power &amp; Fuel</td><td>${inrPlain(state.power_cost)}</td></tr>
+      <tr><td class="lbl">Transportation</td><td>${inrPlain(state.transportation)}</td></tr>
+      <tr class="total"><td class="lbl">Production Cost</td><td>${inrPlain(c.productionCost[n-1]-c.totalDep[n-1] /* excl dep at 100% */)}</td></tr>
+      <tr class="total"><td class="lbl">Administrative Cost</td><td>${inrPlain(state.telephone+state.stationery+state.advertisement+state.workshedRent+state.otherMisc+state.salary.reduce((a,w)=>a+w.count*w.monthly*12,0))}</td></tr>
+      <tr class="grand"><td class="lbl">Manufacturing Cost</td><td>${inrPlain((c.productionCost[n-1]-c.totalDep[n-1])+(state.telephone+state.stationery+state.advertisement+state.workshedRent+state.otherMisc+state.salary.reduce((a,w)=>a+w.count*w.monthly*12,0)))}</td></tr>
+    </tbody></table>
+
+    <div class="sec-h"><span class="num">9.1</span>Projected Profit &amp; Loss Account</div>
+    <table class="rpt"><thead><tr><th class="lbl">Particulars</th>${thYears}</tr></thead><tbody>
+      <tr><td class="lbl">Sales / Receipts</td>${c.sales.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Raw Materials</td>${c.rawMaterials.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Wages</td>${c.wages.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Repairs &amp; Maintenance</td>${c.repairs.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Power &amp; Fuel</td>${c.power.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Transportation</td>${c.transport.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Depreciation</td>${c.totalDep.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
+      <tr class="total"><td class="lbl">Production Cost</td>${c.productionCost.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Salary</td>${c.salary.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Telephone</td>${c.telephone.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Stationery &amp; Postage</td>${c.stationery.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Advertisement &amp; Publicity</td>${c.advertisement.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Workshed Rent</td>${c.workshedRent.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Other Miscellaneous</td>${c.otherMisc.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
+      <tr class="total"><td class="lbl">Administrative Cost</td>${c.adminCost.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Interest — Term Loan</td>${c.termLoanRows.map(r=>`<td>${inrPlain(r.interest)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Interest — Working Capital</td>${c.wcLoanRows.map(r=>`<td>${inrPlain(r.interest)}</td>`).join("")}</tr>
+      <tr class="total"><td class="lbl">Cost of Sale</td>${c.costOfSale.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
+      <tr class="total"><td class="lbl">Net Profit Before Tax</td>${c.netProfitBeforeTax.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Less: Tax</td>${c.tax.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
+      <tr class="grand"><td class="lbl">Net Profit</td>${c.netProfit.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
+    </tbody></table>
+  </div>`;
+
+  // ---- Page 7: DSCR & Balance Sheet ----
+  const page7 = `
+  <div class="page" data-pageno="Page 7 of 8">
+    <div class="sec-h"><span class="num">9.2</span>Debt Service Coverage Ratio</div>
+    <table class="rpt"><thead><tr><th class="lbl">Particulars</th>${thYears}</tr></thead><tbody>
+      <tr><td class="lbl">Net Profit</td>${c.netProfit.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Add: Depreciation</td>${c.totalDep.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
+      <tr class="total"><td class="lbl">Total — A</td>${c.years.map(i=>`<td>${inrPlain(c.netProfit[i]+c.totalDep[i])}</td>`).join("")}</tr>
+      <tr><td class="lbl">Term Loan Interest</td>${c.termLoanRows.map(r=>`<td>${inrPlain(r.interest)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Term Loan Installment</td>${c.termLoanRows.map(r=>`<td>${inrPlain(r.installment)}</td>`).join("")}</tr>
+      <tr><td class="lbl">WC Loan Interest</td>${c.wcLoanRows.map(r=>`<td>${inrPlain(r.interest)}</td>`).join("")}</tr>
+      <tr class="total"><td class="lbl">Total — B</td>${c.years.map(i=>`<td>${inrPlain(c.termLoanRows[i].interest+c.termLoanRows[i].installment+c.wcLoanRows[i].interest)}</td>`).join("")}</tr>
+      <tr class="grand"><td class="lbl">D.S.C.R. = A / B</td>${c.dscr.map(x=>`<td>${x.toFixed(2)}</td>`).join("")}</tr>
+    </tbody></table>
+    <div class="sec-h"><span class="num">9.3</span>Projected Balance Sheet</div>
+    <table class="rpt"><thead><tr><th class="lbl">Liabilities</th>${thYears}</tr></thead><tbody>
+      <tr><td class="lbl">Promoters Capital</td>${c.balanceSheet.map(()=>`<td>${inrPlain(c.ownContribution)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Accumulated Profit</td>${c.balanceSheet.map(b=>`<td>${inrPlain(b.cumProfit)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Term Loan</td>${c.balanceSheet.map(b=>`<td>${inrPlain(b.termLoanClosing)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Working Capital Loan</td>${c.balanceSheet.map(b=>`<td>${inrPlain(b.wcLoanClosing)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Current Liabilities</td>${c.balanceSheet.map(()=>`<td>0</td>`).join("")}</tr>
+      <tr><td class="lbl">Sundry Creditors</td>${c.balanceSheet.map(()=>`<td>0</td>`).join("")}</tr>
+      <tr class="grand"><td class="lbl">Total Liabilities</td>${c.balanceSheet.map(b=>`<td>${inrPlain(b.liabilities)}</td>`).join("")}</tr>
+    </tbody></table>
+    <table class="rpt"><thead><tr><th class="lbl">Assets</th>${thYears}</tr></thead><tbody>
+      <tr><td class="lbl">Gross Fixed Assets</td>${c.balanceSheet.map(()=>`<td>${inrPlain(c.grossFixedAssets)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Less: Depreciation</td>${c.balanceSheet.map(b=>`<td>${inrPlain(b.cumDep)}</td>`).join("")}</tr>
+      <tr class="total"><td class="lbl">Net Fixed Assets</td>${c.balanceSheet.map(b=>`<td>${inrPlain(b.netFixedAssets)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Preliminary &amp; Pre-op. Expenses</td>${c.balanceSheet.map(b=>`<td>${inrPlain(b.prelim)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Current Assets</td>${c.balanceSheet.map(b=>`<td>${inrPlain(b.currentAssets)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Cash in Bank / Hand</td>${c.balanceSheet.map(b=>`<td>${inrPlain(b.cashInBank)}</td>`).join("")}</tr>
+      <tr class="grand"><td class="lbl">Total Assets</td>${c.balanceSheet.map(b=>`<td>${inrPlain(b.totalAssets)}</td>`).join("")}</tr>
+    </tbody></table>
+  </div>`;
+
+  // ---- Page 8: Cash flow & break-even ----
+  const page8 = `
+  <div class="page" data-pageno="Page 8 of 8">
+    <div class="sec-h"><span class="num">9.4</span>Cash Flow Statement</div>
+    <table class="rpt"><thead><tr><th class="lbl">Particulars</th>${thYears}</tr></thead><tbody>
+      <tr><td class="lbl">Net Profit</td>${c.netProfit.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Add: Depreciation</td>${c.totalDep.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Term Loan</td>${c.termLoanRows.map(r=>`<td>${inrPlain(r.opening)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Working Capital Loan</td>${c.wcLoanRows.map(r=>`<td>${inrPlain(r.opening)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Promoters Capital</td>${c.years.map(i=>`<td>${inrPlain(i===0?c.ownContribution:0)}</td>`).join("")}</tr>
+      <tr class="total"><td class="lbl">Total Sources</td>${c.cashFlow.map(cf=>`<td>${inrPlain(cf.sources)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Repayment of Term Loan</td>${c.termLoanRows.map(r=>`<td>${inrPlain(r.installment)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Repayment of WC Loan</td>${c.wcLoanRows.map(r=>`<td>${inrPlain(r.installment)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Current Assets</td>${c.balanceSheet.map(b=>`<td>${inrPlain(b.currentAssets)}</td>`).join("")}</tr>
+      <tr class="total"><td class="lbl">Total Uses</td>${c.cashFlow.map(cf=>`<td>${inrPlain(cf.uses)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Opening Balance</td>${c.cashFlow.map(cf=>`<td>${inrPlain(cf.openingBal)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Surplus</td>${c.cashFlow.map(cf=>`<td>${inrPlain(cf.surplus)}</td>`).join("")}</tr>
+      <tr class="grand"><td class="lbl">Closing Balance</td>${c.cashFlow.map(cf=>`<td>${inrPlain(cf.closingBal)}</td>`).join("")}</tr>
+    </tbody></table>
+
+    <div class="sec-h"><span class="num">9.5</span>Break-Even Point &amp; Ratio Analysis</div>
+    <table class="rpt"><thead><tr><th class="lbl">Particulars</th>${thYears}</tr></thead><tbody>
+      <tr><td class="lbl">Fixed Cost</td>${c.breakEven.map(b=>`<td>${inrPlain(b.fixedCost)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Variable Cost</td>${c.breakEven.map(b=>`<td>${inrPlain(b.variableCost)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Total Cost</td>${c.breakEven.map(b=>`<td>${inrPlain(b.totalCostY)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Sales</td>${c.sales.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Contribution (Sales − VC)</td>${c.breakEven.map(b=>`<td>${inrPlain(b.contribution)}</td>`).join("")}</tr>
+      <tr><td class="lbl">B.E.P in %</td>${c.breakEven.map(b=>`<td>${pct(b.bepPct)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Break-Even Sales</td>${c.breakEven.map(b=>`<td>${inrPlain(b.beSales)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Break-Even Units</td>${c.breakEven.map(b=>`<td>${Math.round(b.beUnits)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Current Ratio</td>${c.currentRatio.map(x=>`<td>${x.toFixed(2)}</td>`).join("")}</tr>
+      <tr><td class="lbl">Net Profit Ratio</td>${c.netProfitRatio.map(x=>`<td>${pct(x)}</td>`).join("")}</tr>
+    </tbody></table>
+    <div class="note-box">This Project Report has been prepared based on the data furnished by the entrepreneur whose details are given in the application.</div>
+    <div class="sign-block">
+      <div>
+        <div class="field"><b>Place:</b> ${state.place||"&nbsp;"}</div>
+        <div class="field"><b>Date:</b> ${state.date||"&nbsp;"}</div>
+      </div>
+      <div class="line">${state.name||"&nbsp;"}<br>Signature of the Beneficiary</div>
+    </div>
+  </div>`;
+
+  const narrative = state.includeNarrative ? buildNarrativePages(c) : "";
+  previewpane.innerHTML = narrative + page1+page2+page3+page4+page5+page6+page7+page8;
+
+  const allPages = previewpane.querySelectorAll('.page');
+  allPages.forEach((el,i)=>{ el.setAttribute('data-pageno', `Page ${i+1} of ${allPages.length}`); });
+}
+
+function update(){
+  const c = computeAll(state);
+  renderPreview(c);
+  window.__lastComputed = c;
+}
+
+/* =========================================================================
+   EXCEL EXPORT — live formulas via ExcelJS
+   ========================================================================= */
+async function exportExcel(){
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "DPR Generator";
+  const cur = '#,##0';
+  const colLetters = ['B','C','D','E','F','G','H','I'];
+  const c = computeAll(state); // used for tenure/array lengths only; sheet itself is formula-driven
+  const n = c.n;
+  const yearCols = colLetters.slice(0,n);
+
+  // ---------- Detailed Project Report sheet ----------
+  const ws = wb.addWorksheet('Detailed Project Report');
+  ws.getColumn('A').width = 38;
+  yearCols.forEach(col=>ws.getColumn(col).width = 14);
+
+  let r = 1;
+  const addTitle = (txt)=>{ ws.mergeCells(`A${r}:${yearCols[yearCols.length-1]||'B'}${r}`); const cell=ws.getCell(`A${r}`); cell.value=txt; cell.font={bold:true,size:14}; cell.alignment={horizontal:'center'}; r+=2; };
+  const addSecHead = (txt)=>{ const cell=ws.getCell(`A${r}`); cell.value=txt; cell.font={bold:true,size:11,color:{argb:'FF152033'}}; r++; };
+  const addRow = (label, vals, opts={})=>{
+    const rowIdx=r;
+    ws.getCell(`A${rowIdx}`).value=label;
+    if(opts.bold) ws.getCell(`A${rowIdx}`).font={bold:true};
+    if(Array.isArray(vals)){
+      vals.forEach((v,i)=>{ const cell=ws.getCell(`${yearCols[i]}${rowIdx}`); cell.value=v; cell.numFmt=opts.fmt||cur; if(opts.bold) cell.font={bold:true}; });
+    } else if(vals!==undefined){
+      const cell=ws.getCell(`B${rowIdx}`); cell.value=vals; cell.numFmt=opts.fmt||cur; if(opts.bold) cell.font={bold:true};
+    }
+    r++;
+    return rowIdx;
+  };
+
+  addTitle('DETAILED PROJECT REPORT');
+
+  addSecHead('1. Cost of Project — A. Fixed Capital Investment');
+  const landRow = addRow('Land', state.land.owned?0:(+state.land.amount||0));
+  const workshedRow = addRow('Workshed', state.workshed.owned?0:(+state.workshed.amount||0));
+  addSecHead('C. Machinery');
+  ws.getCell(`A${r}`).value='Particulars'; ws.getCell(`B${r}`).value='Qty'; ws.getCell(`C${r}`).value='Rate'; ws.getCell(`D${r}`).value='Amount';
+  ['A','B','C','D'].forEach(col=>ws.getCell(`${col}${r}`).font={bold:true});
+  r++;
+  const machStart = r;
+  state.machinery.forEach(m=>{
+    ws.getCell(`A${r}`).value=m.desc;
+    ws.getCell(`B${r}`).value=+m.qty||0;
+    ws.getCell(`C${r}`).value=+m.rate||0; ws.getCell(`C${r}`).numFmt=cur;
+    ws.getCell(`D${r}`).value={formula:`B${r}*C${r}`}; ws.getCell(`D${r}`).numFmt=cur;
+    r++;
+  });
+  const machEnd = r-1;
+  const machineryTotalRow = addRow('Total Machinery', undefined);
+  ws.getCell(`D${machineryTotalRow}`).value = {formula:`SUM(D${machStart}:D${machEnd})`}; ws.getCell(`D${machineryTotalRow}`).numFmt=cur; ws.getCell(`D${machineryTotalRow}`).font={bold:true};
+  const prelimRow = addRow('d. Preliminary & Pre-operative Cost', +state.prelim||0);
+  const furnitureRow = addRow('e. Furniture & Fixtures', +state.furniture||0);
+  const elecRow = addRow('f. Electrification', +state.electrification||0);
+  const capexRow = addRow('Total Capital Expenditure', undefined, {bold:true});
+  ws.getCell(`B${capexRow}`).value = {formula:`B${landRow}+B${workshedRow}+D${machineryTotalRow}+B${prelimRow}+B${furnitureRow}+B${elecRow}`};
+  ws.getCell(`B${capexRow}`).numFmt=cur; ws.getCell(`B${capexRow}`).font={bold:true};
+  const wcRow = addRow('Working Capital', +state.workingCapital||0);
+  const totalCostRow = addRow('Total Cost of Project', undefined, {bold:true});
+  ws.getCell(`B${totalCostRow}`).value = {formula:`B${capexRow}+B${wcRow}`}; ws.getCell(`B${totalCostRow}`).numFmt=cur; ws.getCell(`B${totalCostRow}`).font={bold:true};
+
+  addSecHead('Means of Financing');
+  const ownRow = addRow('Own Contribution', undefined);
+  ws.getCell(`B${ownRow}`).value={formula:`B${totalCostRow}*${state.ownPct}/100`}; ws.getCell(`B${ownRow}`).numFmt=cur;
+  const tlPrincipalRow = addRow('Term Loan', undefined);
+  ws.getCell(`B${tlPrincipalRow}`).value={formula:`B${capexRow}*${state.termLoanPct}/100`}; ws.getCell(`B${tlPrincipalRow}`).numFmt=cur;
+  const wclPrincipalRow = addRow('Working Capital Loan', undefined);
+  ws.getCell(`B${wclPrincipalRow}`).value={formula:`B${wcRow}*${state.wcLoanPct}/100`}; ws.getCell(`B${wclPrincipalRow}`).numFmt=cur;
+  const subsidyRow = addRow('Subsidy (informational)', undefined);
+  ws.getCell(`B${subsidyRow}`).value={formula:`B${totalCostRow}*${state.subsidyPct}/100`}; ws.getCell(`B${subsidyRow}`).numFmt=cur;
+  r++;
+
+  // ---- 3.1 / 3.2 Loan tables ----
+  function loanFormulaTable(title, principalRow, ratePct, bullet){
+    addSecHead(title+` (@ ${ratePct}%)`);
+    ws.getCell(`A${r}`).value='Year'; ws.getCell(`B${r}`).value='Opening'; ws.getCell(`C${r}`).value='Installment'; ws.getCell(`D${r}`).value='Closing'; ws.getCell(`E${r}`).value='Interest';
+    ['A','B','C','D','E'].forEach(col=>ws.getCell(`${col}${r}`).font={bold:true});
+    r++;
+    const startRow=r;
+    for(let y=0;y<n;y++){
+      ws.getCell(`A${r}`).value = heads(n)[y];
+      ws.getCell(`B${r}`).value = y===0 ? {formula:`B${principalRow}`} : {formula:`D${r-1}`};
+      ws.getCell(`C${r}`).value = bullet ? 0 : {formula:`B${principalRow}/${n}`};
+      ws.getCell(`D${r}`).value = {formula:`B${r}-C${r}`};
+      ws.getCell(`E${r}`).value = {formula:`B${r}*${ratePct}/100`};
+      ['B','C','D','E'].forEach(col=>ws.getCell(`${col}${r}`).numFmt=cur);
+      r++;
+    }
+    return startRow;
+  }
+  function heads(n){ return Array.from({length:n},(_,i)=>["1st","2nd","3rd","4th","5th","6th","7th","8th"][i]+" Year"); }
+  const tlStart = loanFormulaTable('3.1 Term Loan Repayment', tlPrincipalRow, state.termLoanRate, false);
+  const wclStart = loanFormulaTable('3.2 Working Capital Loan Repayment', wclPrincipalRow, state.wcLoanRate, !!state.wcBullet);
+
+  // ---- 3.3 Depreciation ----
+  function depFormulaTable(title, costRowRef, ratePct){
+    addSecHead(title+` (@ ${ratePct}% WDV)`);
+    ws.getCell(`A${r}`).value='Particulars'; r0=r;
+    yearCols.forEach((col,i)=>{ ws.getCell(`${col}${r}`).value=heads(n)[i]; ws.getCell(`${col}${r}`).font={bold:true}; });
+    r++;
+    const openRow=r; ws.getCell(`A${r}`).value='Opening Balance'; r++;
+    const depRow=r; ws.getCell(`A${r}`).value='Depreciation'; r++;
+    const closeRow=r; ws.getCell(`A${r}`).value='Closing Balance'; r++;
+    yearCols.forEach((col,i)=>{
+      const prevCol = i===0?null:yearCols[i-1];
+      ws.getCell(`${col}${openRow}`).value = i===0 ? costRowRef : {formula:`${prevCol}${closeRow}`};
+      ws.getCell(`${col}${depRow}`).value = {formula:`${col}${openRow}*${ratePct}/100`};
+      ws.getCell(`${col}${closeRow}`).value = {formula:`${col}${openRow}-${col}${depRow}`};
+      [openRow,depRow,closeRow].forEach(rr=>ws.getCell(`${col}${rr}`).numFmt=cur);
+    });
+    return {openRow, depRow, closeRow};
+  }
+  const workshedDepT = depFormulaTable('Workshed Depreciation', `B${workshedRow}`, state.workshedDepPct);
+  const machineryDepT = depFormulaTable('Machinery Depreciation', `D${machineryTotalRow}`, state.machineryDepPct);
+  const totalDepRow = r; ws.getCell(`A${r}`).value='Total Depreciation'; ws.getCell(`A${r}`).font={bold:true};
+  yearCols.forEach(col=>{ const cell=ws.getCell(`${col}${r}`); cell.value={formula:`${col}${workshedDepT.depRow}+${col}${machineryDepT.depRow}`}; cell.numFmt=cur; cell.font={bold:true}; });
+  r+=2;
+
+  // ---- 4. Sales ----
+  addSecHead('4. Sales');
+  const rateRow = addRow('Rate per Unit', +state.ratePerUnit||0);
+  const unitsRow = addRow('Units at 100% Capacity', +state.unitsAt100||0);
+  const sales100Row = addRow('Sales at 100% Capacity', undefined);
+  ws.getCell(`B${sales100Row}`).value={formula:`B${rateRow}*B${unitsRow}`}; ws.getCell(`B${sales100Row}`).numFmt=cur;
+  const capUtilRow = r; ws.getCell(`A${r}`).value='Capacity Utilization %';
+  yearCols.forEach((col,i)=>{ const cell=ws.getCell(`${col}${r}`); cell.value=state.capacityUtil[i]; cell.numFmt='0"%"'; }); r++;
+  const salesRow = r; ws.getCell(`A${r}`).value='Sales / Receipts'; ws.getCell(`A${r}`).font={bold:true};
+  yearCols.forEach(col=>{ const cell=ws.getCell(`${col}${r}`); cell.value={formula:`$B$${sales100Row}*${col}${capUtilRow}/100`}; cell.numFmt=cur; cell.font={bold:true}; }); r+=2;
+
+  // ---- 5. Manufacturing expenses (100% base, then scaled) ----
+  addSecHead('5. Manufacturing Expenses — 100% Capacity Base');
+  const rawMatBaseRow = addRow('Raw Materials', +state.rawMaterials||0);
+  const wagesBaseRow = r; ws.getCell(`A${r}`).value='Wages (Annual)';
+  ws.getCell(`B${r}`).value = state.wages.reduce((a,w)=>a+(+w.count||0)*(+w.monthly||0)*12,0); ws.getCell(`B${r}`).numFmt=cur; r++;
+  const repairsBaseRow = addRow('Repairs & Maintenance', +state.repairs||0);
+  const powerBaseRow = addRow('Power & Fuel', +state.power_cost||0);
+  const transportBaseRow = addRow('Transportation', +state.transportation||0);
+  r++;
+  addSecHead('6. Administrative Expenses — 100% Capacity Base');
+  const salaryBaseRow = r; ws.getCell(`A${r}`).value='Salary (Annual)';
+  ws.getCell(`B${r}`).value = state.salary.reduce((a,w)=>a+(+w.count||0)*(+w.monthly||0)*12,0); ws.getCell(`B${r}`).numFmt=cur; r++;
+  const telBaseRow = addRow('Telephone', +state.telephone||0);
+  const statBaseRow = addRow('Stationery & Postage', +state.stationery||0);
+  const advBaseRow = addRow('Advertisement & Publicity', +state.advertisement||0);
+  const rentBaseRow = addRow('Workshed Rent (not scaled)', +state.workshedRent||0);
+  const otherBaseRow = addRow('Other Miscellaneous', +state.otherMisc||0);
+  r++;
+
+  // ---- 7.2 / 7.3 scaled tables ----
+  function scaledRow(label, baseRowRef, flat){
+    const rowIdx=r; ws.getCell(`A${rowIdx}`).value=label;
+    yearCols.forEach(col=>{ const cell=ws.getCell(`${col}${rowIdx}`); cell.value = flat ? {formula:`$B$${baseRowRef}`} : {formula:`$B$${baseRowRef}*${col}${capUtilRow}/100`}; cell.numFmt=cur; });
+    r++; return rowIdx;
+  }
+  addSecHead('7.2 Manufacturing Expenses (scaled)');
+  const rawMatRow = scaledRow('Raw Materials', rawMatBaseRow);
+  const wagesRow = scaledRow('Wages', wagesBaseRow);
+  const repairsRow = scaledRow('Repairs & Maintenance', repairsBaseRow);
+  const powerRow = scaledRow('Power & Fuel', powerBaseRow);
+  const transportRow = scaledRow('Transportation', transportBaseRow);
+  const productionCostRow = r; ws.getCell(`A${r}`).value='Production Cost (incl. Depreciation)'; ws.getCell(`A${r}`).font={bold:true};
+  yearCols.forEach(col=>{ const cell=ws.getCell(`${col}${r}`); cell.value={formula:`${col}${rawMatRow}+${col}${wagesRow}+${col}${repairsRow}+${col}${powerRow}+${col}${transportRow}+${col}${totalDepRow}`}; cell.numFmt=cur; cell.font={bold:true}; }); r+=2;
+
+  addSecHead('7.3 Administrative Expenses (scaled)');
+  const salaryRow = scaledRow('Salary', salaryBaseRow);
+  const telRow = scaledRow('Telephone', telBaseRow);
+  const statRow = scaledRow('Stationery & Postage', statBaseRow);
+  const advRow = scaledRow('Advertisement & Publicity', advBaseRow);
+  const rentRow = scaledRow('Workshed Rent', rentBaseRow, true);
+  const otherRow = scaledRow('Other Miscellaneous', otherBaseRow);
+  const adminCostRow = r; ws.getCell(`A${r}`).value='Administrative Cost'; ws.getCell(`A${r}`).font={bold:true};
+  yearCols.forEach(col=>{ const cell=ws.getCell(`${col}${r}`); cell.value={formula:`${col}${salaryRow}+${col}${telRow}+${col}${statRow}+${col}${advRow}+${col}${rentRow}+${col}${otherRow}`}; cell.numFmt=cur; cell.font={bold:true}; }); r+=2;
+
+  // ---- 9.1 P&L ----
+  addSecHead('9.1 Projected Profit & Loss Account');
+  const costOfSaleRow = r; ws.getCell(`A${r}`).value='Cost of Sale'; ws.getCell(`A${r}`).font={bold:true};
+  yearCols.forEach((col,i)=>{ const cell=ws.getCell(`${col}${r}`); cell.value={formula:`${col}${productionCostRow}+${col}${adminCostRow}+${col}${tlStart+i}+E${tlStart+i}`}; cell.numFmt=cur; }); 
+  // fix: interest columns are column E within the loan tables which are row-wise (not per-year-col); use direct refs below instead
+  r++;
+  // Recompute Cost of Sale correctly referencing loan interest cells (column E of loan table rows)
+  yearCols.forEach((col,i)=>{
+    const cell = ws.getCell(`${col}${costOfSaleRow}`);
+    cell.value = {formula:`${col}${productionCostRow}+${col}${adminCostRow}+E${tlStart+i}+E${wclStart+i}`};
+    cell.numFmt = cur; cell.font={bold:true};
+  });
+  const npbtRow = r; ws.getCell(`A${r}`).value='Net Profit Before Tax'; ws.getCell(`A${r}`).font={bold:true};
+  yearCols.forEach(col=>{ const cell=ws.getCell(`${col}${r}`); cell.value={formula:`${col}${salesRow}-${col}${costOfSaleRow}`}; cell.numFmt=cur; cell.font={bold:true}; }); r++;
+  const taxRow = r; ws.getCell(`A${r}`).value='Less: Tax';
+  yearCols.forEach(col=>{ const cell=ws.getCell(`${col}${r}`); cell.value={formula:`MAX(${col}${npbtRow},0)*${state.taxPct}/100+${state.taxFlat||0}`}; cell.numFmt=cur; }); r++;
+  const netProfitRow = r; ws.getCell(`A${r}`).value='Net Profit'; ws.getCell(`A${r}`).font={bold:true};
+  yearCols.forEach(col=>{ const cell=ws.getCell(`${col}${r}`); cell.value={formula:`${col}${npbtRow}-${col}${taxRow}`}; cell.numFmt=cur; cell.font={bold:true}; }); r+=2;
+
+  // ---- 9.2 DSCR ----
+  addSecHead('9.2 Debt Service Coverage Ratio');
+  const dscrARow = r; ws.getCell(`A${r}`).value='Total A (Net Profit + Depreciation)';
+  yearCols.forEach(col=>{ const cell=ws.getCell(`${col}${r}`); cell.value={formula:`${col}${netProfitRow}+${col}${totalDepRow}`}; cell.numFmt=cur; }); r++;
+  const dscrBRow = r; ws.getCell(`A${r}`).value='Total B (TL Int+Inst + WCL Int)';
+  yearCols.forEach((col,i)=>{ const cell=ws.getCell(`${col}${r}`); cell.value={formula:`E${tlStart+i}+C${tlStart+i}+E${wclStart+i}`}; cell.numFmt=cur; }); r++;
+  const dscrRow = r; ws.getCell(`A${r}`).value='D.S.C.R.'; ws.getCell(`A${r}`).font={bold:true};
+  yearCols.forEach(col=>{ const cell=ws.getCell(`${col}${r}`); cell.value={formula:`${col}${dscrARow}/${col}${dscrBRow}`}; cell.numFmt='0.00'; cell.font={bold:true}; }); r+=2;
+
+  // ---- 9.3 Balance Sheet ----
+  addSecHead('9.3 Projected Balance Sheet — Liabilities');
+  const promCapRow = r; ws.getCell(`A${r}`).value='Promoters Capital';
+  yearCols.forEach(col=>{ const cell=ws.getCell(`${col}${r}`); cell.value={formula:`B${ownRow}`}; cell.numFmt=cur; }); r++;
+  const cumProfitRow = r; ws.getCell(`A${r}`).value='Accumulated Profit';
+  yearCols.forEach((col,i)=>{ const cell=ws.getCell(`${col}${r}`); cell.value = i===0 ? {formula:`${col}${netProfitRow}`} : {formula:`${yearCols[i-1]}${r}+${col}${netProfitRow}`}; cell.numFmt=cur; }); r++;
+  const tlClosingRefRow = r; ws.getCell(`A${r}`).value='Term Loan (Closing)';
+  yearCols.forEach((col,i)=>{ const cell=ws.getCell(`${col}${r}`); cell.value={formula:`D${tlStart+i}`}; cell.numFmt=cur; }); r++;
+  const wclClosingRefRow = r; ws.getCell(`A${r}`).value='Working Capital Loan (Closing)';
+  yearCols.forEach((col,i)=>{ const cell=ws.getCell(`${col}${r}`); cell.value={formula:`D${wclStart+i}`}; cell.numFmt=cur; }); r++;
+  const totalLiabRow = r; ws.getCell(`A${r}`).value='Total Liabilities'; ws.getCell(`A${r}`).font={bold:true};
+  yearCols.forEach(col=>{ const cell=ws.getCell(`${col}${r}`); cell.value={formula:`${col}${promCapRow}+${col}${cumProfitRow}+${col}${tlClosingRefRow}+${col}${wclClosingRefRow}`}; cell.numFmt=cur; cell.font={bold:true}; }); r+=2;
+
+  addSecHead('Assets');
+  const gfaRow = r; ws.getCell(`A${r}`).value='Gross Fixed Assets';
+  yearCols.forEach(col=>{ const cell=ws.getCell(`${col}${r}`); cell.value={formula:`B${workshedRow}+D${machineryTotalRow}+B${furnitureRow}+B${elecRow}`}; cell.numFmt=cur; }); r++;
+  const cumDepRow = r; ws.getCell(`A${r}`).value='Less: Cumulative Depreciation';
+  yearCols.forEach((col,i)=>{ const cell=ws.getCell(`${col}${r}`); cell.value = i===0 ? {formula:`${col}${totalDepRow}`} : {formula:`${yearCols[i-1]}${r}+${col}${totalDepRow}`}; cell.numFmt=cur; }); r++;
+  const nfaRow = r; ws.getCell(`A${r}`).value='Net Fixed Assets'; ws.getCell(`A${r}`).font={bold:true};
+  yearCols.forEach(col=>{ const cell=ws.getCell(`${col}${r}`); cell.value={formula:`${col}${gfaRow}-${col}${cumDepRow}`}; cell.numFmt=cur; cell.font={bold:true}; }); r++;
+  const curAssetRow = r; ws.getCell(`A${r}`).value='Current Assets';
+  yearCols.forEach(col=>{ const cell=ws.getCell(`${col}${r}`); cell.value={formula:`B${wcRow}`}; cell.numFmt=cur; }); r++;
+  const cashRow = r; ws.getCell(`A${r}`).value='Cash in Bank / Hand';
+  yearCols.forEach(col=>{ const cell=ws.getCell(`${col}${r}`); cell.value={formula:`${col}${totalLiabRow}-(${col}${nfaRow}+B${prelimRow}+${col}${curAssetRow})`}; cell.numFmt=cur; }); r++;
+  const totalAssetRow = r; ws.getCell(`A${r}`).value='Total Assets'; ws.getCell(`A${r}`).font={bold:true};
+  yearCols.forEach(col=>{ const cell=ws.getCell(`${col}${r}`); cell.value={formula:`${col}${nfaRow}+B${prelimRow}+${col}${curAssetRow}+${col}${cashRow}`}; cell.numFmt=cur; cell.font={bold:true}; }); r+=2;
+
+  // ---- 9.4 Cash Flow ----
+  addSecHead('9.4 Cash Flow Statement');
+  const sourcesRow = r; ws.getCell(`A${r}`).value='Total Sources';
+  yearCols.forEach((col,i)=>{ const cell=ws.getCell(`${col}${r}`); cell.value={formula:`${col}${netProfitRow}+${col}${totalDepRow}+B${tlStart+i}+B${wclStart+i}+${i===0?`B${ownRow}`:0}`}; cell.numFmt=cur; }); r++;
+  const usesRow = r; ws.getCell(`A${r}`).value='Total Uses';
+  yearCols.forEach((col,i)=>{ const cell=ws.getCell(`${col}${r}`); cell.value={formula:`C${tlStart+i}+C${wclStart+i}+${col}${curAssetRow}`}; cell.numFmt=cur; }); r++;
+  const openBalRow = r; ws.getCell(`A${r}`).value='Opening Balance';
+  yearCols.forEach((col,i)=>{ const cell=ws.getCell(`${col}${r}`); cell.value = i===0 ? 0 : {formula:`${yearCols[i-1]}${r+2}`}; cell.numFmt=cur; }); r++;
+  const surplusRow = r; ws.getCell(`A${r}`).value='Surplus';
+  yearCols.forEach(col=>{ const cell=ws.getCell(`${col}${r}`); cell.value={formula:`${col}${sourcesRow}-${col}${usesRow}`}; cell.numFmt=cur; }); r++;
+  const closeBalRow = r; ws.getCell(`A${r}`).value='Closing Balance'; ws.getCell(`A${r}`).font={bold:true};
+  yearCols.forEach(col=>{ const cell=ws.getCell(`${col}${r}`); cell.value={formula:`${col}${openBalRow}+${col}${surplusRow}`}; cell.numFmt=cur; cell.font={bold:true}; }); r+=2;
+
+  // ---- 9.5 Break-even ----
+  addSecHead('9.5 Break-Even Point & Ratio Analysis');
+  const fixedCostRow = r; ws.getCell(`A${r}`).value='Fixed Cost';
+  yearCols.forEach((col,i)=>{ const cell=ws.getCell(`${col}${r}`); cell.value={formula:`${col}${adminCostRow}+E${tlStart+i}+${col}${totalDepRow}`}; cell.numFmt=cur; }); r++;
+  const varCostRow = r; ws.getCell(`A${r}`).value='Variable Cost';
+  yearCols.forEach((col,i)=>{ const cell=ws.getCell(`${col}${r}`); cell.value={formula:`${col}${productionCostRow}+E${wclStart+i}`}; cell.numFmt=cur; }); r++;
+  const totCostRow = r; ws.getCell(`A${r}`).value='Total Cost';
+  yearCols.forEach(col=>{ const cell=ws.getCell(`${col}${r}`); cell.value={formula:`${col}${fixedCostRow}+${col}${varCostRow}`}; cell.numFmt=cur; }); r++;
+  const contribRow = r; ws.getCell(`A${r}`).value='Contribution (Sales − VC)';
+  yearCols.forEach(col=>{ const cell=ws.getCell(`${col}${r}`); cell.value={formula:`${col}${salesRow}-${col}${varCostRow}`}; cell.numFmt=cur; }); r++;
+  const bepRow = r; ws.getCell(`A${r}`).value='B.E.P in %'; ws.getCell(`A${r}`).font={bold:true};
+  yearCols.forEach(col=>{ const cell=ws.getCell(`${col}${r}`); cell.value={formula:`IF(${col}${contribRow}=0,0,${col}${fixedCostRow}/${col}${contribRow})`}; cell.numFmt='0.00%'; cell.font={bold:true}; }); r++;
+  const beSalesRow = r; ws.getCell(`A${r}`).value='Break-Even Sales';
+  yearCols.forEach(col=>{ const cell=ws.getCell(`${col}${r}`); cell.value={formula:`${col}${bepRow}*${col}${salesRow}`}; cell.numFmt=cur; }); r++;
+  const beUnitsRow = r; ws.getCell(`A${r}`).value='Break-Even Units';
+  yearCols.forEach(col=>{ const cell=ws.getCell(`${col}${r}`); cell.value={formula:`IF(B${rateRow}=0,0,${col}${beSalesRow}/B${rateRow})`}; cell.numFmt='0'; }); r++;
+  const netProfitRatioRow = r; ws.getCell(`A${r}`).value='Net Profit Ratio';
+  yearCols.forEach(col=>{ const cell=ws.getCell(`${col}${r}`); cell.value={formula:`IF(${col}${salesRow}=0,0,${col}${netProfitRow}/${col}${salesRow})`}; cell.numFmt='0.00%'; }); r+=2;
+
+  // Signature block
+  ws.getCell(`A${r}`).value = 'Place:'; ws.getCell(`B${r}`).value = state.place; r++;
+  ws.getCell(`A${r}`).value = 'Date:'; ws.getCell(`B${r}`).value = state.date; r++;
+  ws.getCell(`A${r}`).value = 'Full Name:'; ws.getCell(`B${r}`).value = state.name; r++;
+  ws.getCell(`A${r}`).value = 'Signature of the Beneficiary';
+
+  // ---------- Top Sheet ----------
+  const ts = wb.addWorksheet('Top Sheet', {properties:{tabColor:{argb:'FFA9762C'}}});
+  ts.getColumn('A').width = 32; ts.getColumn('B').width = 50;
+  let tr=1;
+  ts.mergeCells(`A${tr}:B${tr}`); ts.getCell(`A${tr}`).value='PROJECT AT A GLANCE - TOP SHEET'; ts.getCell(`A${tr}`).font={bold:true,size:14}; ts.getCell(`A${tr}`).alignment={horizontal:'center'}; tr+=2;
+  const tsRow = (label, value, fmt)=>{ ts.getCell(`A${tr}`).value=label; ts.getCell(`A${tr}`).font={bold:true}; const c=ts.getCell(`B${tr}`); if(typeof value==='object') c.value=value; else c.value=value; if(fmt) c.numFmt=fmt; tr++; };
+  tsRow('1. Name of the Entrepreneur', state.name);
+  tsRow('2. Constitution', state.constitution);
+  tsRow('3. Phone Number', state.phone);
+  tsRow('4. Address', state.address.replace(/\n/g,', '));
+  tsRow('5. Product and By-Product', state.product+' — '+state.unitAddress);
+  tsRow('6. Cost of Project', {formula:`'Detailed Project Report'!B${totalCostRow}`}, cur);
+  tsRow('   Name of Project', state.projectName);
+  tsRow('7a. Term Loan', {formula:`'Detailed Project Report'!B${tlPrincipalRow}`}, cur);
+  tsRow('7b. Working Capital Loan', {formula:`'Detailed Project Report'!B${wclPrincipalRow}`}, cur);
+  tsRow('7c. Own Capital', {formula:`'Detailed Project Report'!B${ownRow}`}, cur);
+  tsRow('8. Debt Service Coverage Ratio', {formula:`'Detailed Project Report'!B${dscrRow}`}, '0.00');
+  tsRow('9. Pay Back Period', `${n} Years`);
+  tsRow('10. Project Implementation', `${state.implMonths} Months`);
+  tsRow('11. Break Even Point', {formula:`'Detailed Project Report'!B${bepRow}`}, '0.00%');
+  tsRow('12. Employment', state.employment);
+  tsRow('13. Power Requirement', `${state.power} kW`);
+  tsRow('14. Major Raw Materials', state.rawMaterialsDesc);
+  tsRow('15. Estimated Annual Sales Turnover', {formula:`'Detailed Project Report'!B${sales100Row}`}, cur);
+
+  const buf = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `DPR_${(state.name||'report').replace(/\s+/g,'_')}.xlsx`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+document.getElementById('xlsxBtn').addEventListener('click', ()=>{
+  exportExcel().catch(err=>{ console.error(err); alert('Excel export failed: '+err.message); });
+});
+
+/* =========================================================================
+   TENURE SWITCH — callable from toggle buttons (defined before renderForm
+   so it exists when the buttons first render)
+   ========================================================================= */
+const CAPACITY_DEFAULTS = {
+  5: [60, 70, 80, 90, 100],
+  7: [50, 55, 60, 70, 80, 90, 100]
+};
+
+function setTenure(yr){
+  if(yr !== 5 && yr !== 7) return;
+  // Only reset capacity util if switching tenure, not on first load
+  if(state.loanTenure !== yr){
+    state.loanTenure = yr;
+    state.capacityUtil = [...CAPACITY_DEFAULTS[yr]];
+  }
+  renderForm();
+  update();
+}
+
+/* =========================================================================
+   INIT
+   ========================================================================= */
+renderForm();
+update();
+</script>
+</body>
+</html>
