@@ -1,15 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-   <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-0VP47RNZ17"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-0VP47RNZ17');
-</script>
+  
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DPR Generator — Detailed Project Report Builder</title>
@@ -293,9 +285,19 @@ table.rpt tr.grand td{font-weight:700;background:var(--navy);color:#fff;}
     </div>
   </div>
   <div class="topbar-actions">
+    <button class="btn btn-ghost" id="saveProjectBtn" title="Save all entered details as a project file you can re-open later">Save Project</button>
+    <button class="btn btn-ghost" id="loadProjectBtn" title="Open a previously saved project file">Open Project</button>
+    <input type="file" id="loadProjectInput" accept="application/json,.json" style="display:none">
     <button class="btn btn-ghost" onclick="window.print()">Download PDF</button>
     <button class="btn btn-primary" id="xlsxBtn">Download Excel</button>
   </div>
+</div>
+<div id="autosaveNotice" style="display:none;background:#fff7e6;border-bottom:1px solid var(--line);padding:10px 28px;font-size:13px;color:#5a5345;align-items:center;justify-content:space-between;gap:12px;">
+  <span id="autosaveNoticeText"></span>
+  <span style="display:flex;gap:8px;flex-shrink:0;">
+    <button class="btn btn-primary" id="autosaveRestoreBtn" style="padding:6px 12px;font-size:12.5px;">Restore it</button>
+    <button class="btn btn-ghost" id="autosaveDismissBtn" style="padding:6px 12px;font-size:12.5px;color:#5a5345;border-color:#d8d2c2;">Start blank</button>
+  </span>
 </div>
 
 <div class="layout">
@@ -1247,6 +1249,87 @@ function update(){
   const c = computeAll(state);
   renderPreview(c);
   window.__lastComputed = c;
+  autosaveToBrowser();
+}
+
+/* =========================================================================
+   SAVE / OPEN PROJECT — keeps every field so a project can be closed and
+   re-opened later without retyping. Two layers:
+     1. Autosave to this browser's localStorage (silent, automatic).
+     2. Save Project / Open Project — a portable .json file the user
+        downloads and can re-open on any device, or hand to a colleague.
+   ========================================================================= */
+const AUTOSAVE_KEY = 'dprGeneratorAutosave_v1';
+
+function autosaveToBrowser(){
+  try{
+    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({ savedAt: new Date().toISOString(), state }));
+  }catch(e){ /* storage unavailable or full — ignore silently */ }
+}
+
+function downloadProjectFile(){
+  const payload = { type:'dpr-generator-project', version:1, savedAt:new Date().toISOString(), state };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const label = (state.name || state.projectName || 'project').replace(/[^\w\-]+/g,'_');
+  a.href = url; a.download = `DPR_${label}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function loadStateFromObject(obj){
+  // Merge onto the existing state so any fields added in a newer version
+  // of this tool that are missing from an older saved file keep their
+  // defaults instead of becoming undefined.
+  Object.keys(obj).forEach(k=>{ state[k] = obj[k]; });
+  if(!state.capacityUtil || !state.capacityUtil.length) state.capacityUtil = [...CAPACITY_DEFAULTS[state.loanTenure===7?7:5]];
+  renderForm();
+  update();
+}
+
+document.getElementById('saveProjectBtn').addEventListener('click', downloadProjectFile);
+
+document.getElementById('loadProjectBtn').addEventListener('click', ()=>{
+  document.getElementById('loadProjectInput').click();
+});
+
+document.getElementById('loadProjectInput').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (evt)=>{
+    try{
+      const parsed = JSON.parse(evt.target.result);
+      const loadedState = parsed && parsed.state ? parsed.state : parsed; // accept raw state JSON too
+      if(!loadedState || typeof loadedState !== 'object') throw new Error('File does not look like a saved project.');
+      loadStateFromObject(loadedState);
+      alert('Project loaded — all details have been restored.');
+    }catch(err){
+      alert('Could not open this file as a DPR project: '+err.message);
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = ''; // allow re-selecting the same file later
+});
+
+function initAutosaveBanner(){
+  let saved = null;
+  try{ saved = JSON.parse(localStorage.getItem(AUTOSAVE_KEY) || 'null'); }catch(e){ saved = null; }
+  if(!saved || !saved.state) return;
+  const notice = document.getElementById('autosaveNotice');
+  const text = document.getElementById('autosaveNoticeText');
+  const when = saved.savedAt ? new Date(saved.savedAt).toLocaleString() : 'earlier';
+  const who = (saved.state.name || saved.state.projectName) ? ` (${saved.state.name || saved.state.projectName})` : '';
+  text.textContent = `Found an unsaved project${who} from this browser, last edited ${when}. Restore it, or start blank.`;
+  notice.style.display = 'flex';
+  document.getElementById('autosaveRestoreBtn').addEventListener('click', ()=>{
+    loadStateFromObject(saved.state);
+    notice.style.display = 'none';
+  });
+  document.getElementById('autosaveDismissBtn').addEventListener('click', ()=>{
+    notice.style.display = 'none';
+  });
 }
 
 /* =========================================================================
@@ -1580,6 +1663,7 @@ function setTenure(yr){
    ========================================================================= */
 renderForm();
 update();
+initAutosaveBanner();
 </script>
 </body>
 </html>
