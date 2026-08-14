@@ -1,15 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
- <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-0VP47RNZ17"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-0VP47RNZ17');
-</script> 
+  
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DPR Generator — Detailed Project Report Builder</title>
@@ -272,12 +264,60 @@ table.rpt tr.grand td{font-weight:700;background:var(--navy);color:#fff;}
 .badge{display:inline-block;font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:10px;background:#eef3ec;color:var(--good);}
 
 /* print */
+@page{
+  size:A4;
+  margin:12mm;
+}
+
 @media print{
-  .topbar,.formpane{display:none !important;}
+  html,body{
+    background:#fff;
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
+    color-adjust:exact;
+  }
+  .topbar,.formpane,#autosaveNotice,#activeProjectBar,#projectLibraryModal,#printTipsModal{display:none !important;}
   .layout{display:block;}
   .previewpane{padding:0;}
-  .page{box-shadow:none;border:none;margin:0;page-break-after:always;max-width:none;width:100%;padding:18mm 16mm;}
-  body{background:#fff;}
+
+  /* No forced break between sections — content flows continuously and
+     a new physical page only starts when the current one actually runs
+     out of room. This is what keeps a short/blank report to a handful
+     of pages instead of one page per section. */
+  .page{
+    box-shadow:none;
+    border:none;
+    margin:0 0 4mm;
+    max-width:none;
+    width:100%;
+    padding:0;
+  }
+  .page + .page{border-top:1px solid #cfc6b0;padding-top:5mm;margin-top:1mm;}
+  .page::before{content:none;} /* the on-screen "Page N of M" footer badge only made sense one-per-sheet; drop it in print now that sections no longer map 1:1 to pages */
+
+  /* Explicit forced breaks for specific pages (cover, and the Project
+     at a Glance top sheet), overriding the flow-continuously default
+     above just for these two spots. Also drop the flow-divider border
+     wherever a forced break already separates two pages. */
+  .pb-after{break-after:page;page-break-after:always;}
+  .pb-before{break-before:page;page-break-before:always;border-top:none !important;padding-top:0 !important;margin-top:0 !important;}
+  .pb-after + .page{border-top:none;padding-top:0;margin-top:0;}
+
+  /* Still avoid ugly natural breaks: repeat table headers if a table
+     does end up spanning two pages, don't slice a row in half, and
+     don't strand a section heading alone at the bottom of a page. */
+  table.rpt{break-inside:auto;}
+  table.rpt thead{display:table-header-group;}
+  table.rpt tr{break-inside:avoid;page-break-inside:avoid;}
+  .sec-h{break-after:avoid;page-break-after:avoid;break-inside:avoid;}
+  .kv,.glance-row{break-inside:avoid;page-break-inside:avoid;}
+  .swot-grid,.sign-block,.note-box{break-inside:avoid;page-break-inside:avoid;}
+
+  /* Force the navy/brass fills to stay legible even on printers or PDF
+     settings that ignore background graphics, so grand-total rows never
+     render as invisible white-on-white text. */
+  table.rpt tr.grand td{background:#e4e9f2 !important;color:#152033 !important;border-top:1.5px solid var(--navy);font-weight:700;}
+  .glance-num{background:#152033 !important;color:#fff !important;}
 }
  
 </style>
@@ -293,12 +333,18 @@ table.rpt tr.grand td{font-weight:700;background:var(--navy);color:#fff;}
     </div>
   </div>
   <div class="topbar-actions">
-    <button class="btn btn-ghost" id="saveProjectBtn" title="Save all entered details as a project file you can re-open later">Save Project</button>
-    <button class="btn btn-ghost" id="loadProjectBtn" title="Open a previously saved project file">Open Project</button>
+    <button class="btn btn-ghost" id="newProjectBtn" title="Start a fresh, blank project">New Project</button>
+    <button class="btn btn-ghost" id="libraryBtn" title="Browse all projects saved in this browser">Projects</button>
+    <button class="btn btn-ghost" id="saveProjectBtn" title="Save this project (keeps it in your Projects list and downloads a file too)">Save Project</button>
+    <button class="btn btn-ghost" id="loadProjectBtn" title="Open a project file from disk">Open File</button>
     <input type="file" id="loadProjectInput" accept="application/json,.json" style="display:none">
-    <button class="btn btn-ghost" onclick="window.print()">Download PDF</button>
+    <button class="btn btn-ghost" id="pdfBtn" title="Download a print-ready PDF">Download PDF</button>
     <button class="btn btn-primary" id="xlsxBtn">Download Excel</button>
   </div>
+</div>
+<div id="activeProjectBar" style="display:none;background:#eef1f7;border-bottom:1px solid var(--line);padding:7px 28px;font-size:12.5px;color:#3a4256;align-items:center;gap:8px;">
+  <span style="font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--brass);border:1px solid var(--brass);border-radius:3px;padding:1px 6px;">OPEN</span>
+  <span id="activeProjectLabel"></span>
 </div>
 <div id="autosaveNotice" style="display:none;background:#fff7e6;border-bottom:1px solid var(--line);padding:10px 28px;font-size:13px;color:#5a5345;align-items:center;justify-content:space-between;gap:12px;">
   <span id="autosaveNoticeText"></span>
@@ -306,6 +352,40 @@ table.rpt tr.grand td{font-weight:700;background:var(--navy);color:#fff;}
     <button class="btn btn-primary" id="autosaveRestoreBtn" style="padding:6px 12px;font-size:12.5px;">Restore it</button>
     <button class="btn btn-ghost" id="autosaveDismissBtn" style="padding:6px 12px;font-size:12.5px;color:#5a5345;border-color:#d8d2c2;">Start blank</button>
   </span>
+</div>
+
+<div id="projectLibraryModal" style="display:none;position:fixed;inset:0;background:rgba(21,32,51,.55);z-index:200;align-items:flex-start;justify-content:center;padding:60px 20px;">
+  <div style="background:#fff;border-radius:10px;max-width:640px;width:100%;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+    <div style="padding:16px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;">
+      <h2 style="margin:0;font-family:var(--serif);font-size:17px;color:var(--navy);">Projects saved in this browser</h2>
+      <button class="btn btn-ghost" id="libraryCloseBtn" style="padding:5px 11px;color:#5a5345;border-color:#d8d2c2;">Close</button>
+    </div>
+    <div id="libraryList" style="overflow-y:auto;padding:8px 12px;"></div>
+    <div style="padding:10px 20px;border-top:1px solid var(--line);font-size:11.5px;color:#8a8270;">
+      Projects are stored only in this browser. Use <strong>Save Project</strong> to also download a portable file you can keep elsewhere or open on another computer.
+    </div>
+  </div>
+</div>
+
+<div id="printTipsModal" style="display:none;position:fixed;inset:0;background:rgba(21,32,51,.55);z-index:200;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:10px;max-width:440px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+    <div style="padding:18px 22px 6px;">
+      <h2 style="margin:0 0 8px;font-family:var(--serif);font-size:17px;color:var(--navy);">For the cleanest PDF</h2>
+      <p style="font-size:12.8px;color:#5a5345;line-height:1.6;margin:0 0 10px;">In the print dialog that opens next, for best results:</p>
+      <ul style="font-size:12.8px;color:#5a5345;line-height:1.7;margin:0 0 10px;padding-left:18px;">
+        <li>Set <strong>Destination</strong> to "Save as PDF"</li>
+        <li>Set <strong>Paper size</strong> to A4</li>
+        <li>Turn <strong>Headers and footers</strong> OFF</li>
+        <li>Turn <strong>Background graphics</strong> ON</li>
+        <li>Set <strong>Margins</strong> to "Default" or "None"</li>
+      </ul>
+      <label class="checkrow" style="margin-bottom:14px;"><input type="checkbox" id="printTipsDontShow"> <span style="font-size:12px;color:#8a8270;">Don't show this again</span></label>
+    </div>
+    <div style="padding:12px 22px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px;">
+      <button class="btn btn-ghost" id="printTipsCancel" style="color:#5a5345;border-color:#d8d2c2;">Cancel</button>
+      <button class="btn btn-primary" id="printTipsContinue">Continue to Print</button>
+    </div>
+  </div>
 </div>
 
 <div class="layout">
@@ -316,9 +396,13 @@ table.rpt tr.grand td{font-weight:700;background:var(--navy);color:#fff;}
 <script>
 /* =========================================================================
    STATE — defaults pre-filled with a representative example so the report
-   renders immediately; every field is user-editable.
+   renders immediately; every field is user-editable. defaultState() is a
+   factory (not a shared object) so "New Project" can produce a truly
+   blank slate without disturbing the single, stable `state` reference
+   that the rest of the app reads and writes to.
    ========================================================================= */
-const state = {
+function defaultState(){
+ return {
   name:"",
   constitution:"Proprietorship",
   phone:"",
@@ -359,7 +443,9 @@ const state = {
 
   place:"", date:"",
   includeNarrative:true
-};
+ };
+}
+const state = defaultState();
 
 /* =========================================================================
    CALCULATION ENGINE — pure, shared by preview + Excel export
@@ -789,7 +875,7 @@ function buildNarrativePages(c){
 
   // ---- Cover ----
   const cover = `
-  <div class="page" data-pageno="">
+  <div class="page pb-after" data-pageno="">
     <div style="text-align:center;margin-top:54px">
       <div style="font-family:var(--mono);letter-spacing:.22em;font-size:11px;color:var(--brass)">DETAILED PROJECT REPORT</div>
       <div style="font-family:var(--serif);font-weight:700;font-size:28px;color:var(--navy);margin-top:14px">${businessName||"&mdash;"}</div>
@@ -966,7 +1052,7 @@ function buildNarrativePages(c){
     <table class="rpt"><thead><tr><th class="lbl">Factor</th><th class="lbl">Assessment</th></tr></thead>
       <tbody>${competitiveRows.map(([f,a])=>`<tr><td class="lbl">${f}</td><td class="lbl">${a}</td></tr>`).join("")}</tbody></table>
     <div class="sec-h" style="font-size:12.5px"><span class="num">3.5</span>SWOT Analysis</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:12px">
+    <div class="swot-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:12px">
       ${swotGrid("Strengths", swotStrengths)}
       ${swotGrid("Weaknesses", swotWeaknesses)}
       ${swotGrid("Opportunities", swotOpportunities)}
@@ -988,7 +1074,7 @@ function renderPreview(c){
 
   // ---- Page 1: Top sheet ----
   const page1 = `
-  <div class="page" data-pageno="Page 1 of 8">
+  <div class="page pb-before pb-after" data-pageno="Page 1 of 8">
     <div class="rpt-title">Project at a Glance — Top Sheet</div>
     <div class="rpt-sub">Detailed Project Report</div>
     <div class="glance-row"><span class="glance-num">1</span><span class="gk">Name of the Entrepreneur</span><span class="gv">${state.name}</span></div>
@@ -1048,11 +1134,15 @@ function renderPreview(c){
       <tr><td class="lbl">Closing Balance</td>${rows.map(r=>`<td>${inrPlain(r.closing)}</td>`).join("")}</tr>
     </tbody></table>`;
   const page3 = `
-  <div class="page" data-pageno="Page 3 of 8">
+  <div class="page" data-pageno="">
     <div class="sec-h"><span class="num">3.1</span>Repayment of Term Loan &amp; Working Capital Loan</div>
     ${loanTbl("Term Loan", c.termLoanRows, state.termLoanRate)}
     <div class="sec-h"><span class="num">3.2</span>Working Capital Loan <span style="float:right;font-family:var(--mono);font-weight:400;font-size:11px;color:#8a8270">@ ${state.wcLoanRate}%</span></div>
     ${loanTbl("", c.wcLoanRows, state.wcLoanRate, false)}
+  </div>`;
+
+  const page3b = `
+  <div class="page" data-pageno="">
     <div class="sec-h"><span class="num">3.3</span>Depreciation on Fixed Assets</div>
     ${depTbl("Workshed", c.workshedDep, state.workshedDepPct)}
     ${depTbl("Machinery", c.machineryDep, state.machineryDepPct)}
@@ -1090,9 +1180,9 @@ function renderPreview(c){
     <div class="kv"><div class="k"><span class="num" style="color:var(--brass)">5.4</span> Transportation</div><div class="v">${inr(state.transportation)}</div></div>
   </div>`;
 
-  // ---- Page 5: Admin expenses & capacity table ----
+  // ---- Page 5: Admin expenses (salary + misc items) ----
   const page5 = `
-  <div class="page" data-pageno="Page 5 of 8">
+  <div class="page" data-pageno="">
     <div class="sec-h"><span class="num">6.1</span>Administrative Expenses — Salary</div>
     <table class="rpt"><thead><tr><th class="lbl">Particulars</th><th>No.</th><th>Per Month</th><th>Amount (Per Annum)</th></tr></thead>
       <tbody>${state.salary.map(w=>`<tr><td class="lbl">${w.role}</td><td>${w.count}</td><td>${inrPlain(w.monthly)}</td><td>${inrPlain(w.count*w.monthly*12)}</td></tr>`).join("")}
@@ -1102,7 +1192,11 @@ function renderPreview(c){
     <div class="kv"><div class="k"><span class="num" style="color:var(--brass)">6.4</span> Advertisement &amp; Publicity</div><div class="v">${inr(state.advertisement)}</div></div>
     <div class="kv"><div class="k"><span class="num" style="color:var(--brass)">6.5</span> Workshed Rent</div><div class="v">${inr(state.workshedRent)}</div></div>
     <div class="kv"><div class="k"><span class="num" style="color:var(--brass)">6.6</span> Other Miscellaneous Expenses</div><div class="v">${inr(state.otherMisc)}</div></div>
+  </div>`;
 
+  // ---- Page 5b: Capacity-scaled manufacturing & admin expenses ----
+  const page5b = `
+  <div class="page" data-pageno="">
     <div class="sec-h"><span class="num">7.1</span>Capacity Utilization of Manufacturing &amp; Administrative Expenses</div>
     <table class="rpt"><thead><tr><th class="lbl">Particulars</th>${thYears}</tr></thead>
       <tbody><tr><td class="lbl">Capacity Utilization</td>${state.capacityUtil.map(x=>`<td>${x}%</td>`).join("")}</tr></tbody></table>
@@ -1126,9 +1220,9 @@ function renderPreview(c){
     </tbody></table>
   </div>`;
 
-  // ---- Page 6: WC assessment & P&L ----
+  // ---- Page 6: Assessment of working capital ----
   const page6 = `
-  <div class="page" data-pageno="Page 6 of 8">
+  <div class="page" data-pageno="">
     <div class="sec-h"><span class="num">8</span>Assessment of Working Capital</div>
     <table class="rpt"><thead><tr><th class="lbl">Particulars</th><th>Amount (Rs.)</th></tr></thead><tbody>
       <tr><td class="lbl">Sale</td><td>${inrPlain(c.salesAt100)}</td></tr>
@@ -1141,7 +1235,12 @@ function renderPreview(c){
       <tr class="total"><td class="lbl">Administrative Cost</td><td>${inrPlain(state.telephone+state.stationery+state.advertisement+state.workshedRent+state.otherMisc+state.salary.reduce((a,w)=>a+w.count*w.monthly*12,0))}</td></tr>
       <tr class="grand"><td class="lbl">Manufacturing Cost</td><td>${inrPlain((c.productionCost[n-1]-c.totalDep[n-1])+(state.telephone+state.stationery+state.advertisement+state.workshedRent+state.otherMisc+state.salary.reduce((a,w)=>a+w.count*w.monthly*12,0)))}</td></tr>
     </tbody></table>
+  </div>`;
 
+  // ---- Page 6b: Projected Profit & Loss Account (kept on its own page — this
+  //      table alone is close to a full page's worth of rows) ----
+  const page6b = `
+  <div class="page" data-pageno="">
     <div class="sec-h"><span class="num">9.1</span>Projected Profit &amp; Loss Account</div>
     <table class="rpt"><thead><tr><th class="lbl">Particulars</th>${thYears}</tr></thead><tbody>
       <tr><td class="lbl">Sales / Receipts</td>${c.sales.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
@@ -1168,9 +1267,9 @@ function renderPreview(c){
     </tbody></table>
   </div>`;
 
-  // ---- Page 7: DSCR & Balance Sheet ----
+  // ---- Page 7: DSCR ----
   const page7 = `
-  <div class="page" data-pageno="Page 7 of 8">
+  <div class="page" data-pageno="">
     <div class="sec-h"><span class="num">9.2</span>Debt Service Coverage Ratio</div>
     <table class="rpt"><thead><tr><th class="lbl">Particulars</th>${thYears}</tr></thead><tbody>
       <tr><td class="lbl">Net Profit</td>${c.netProfit.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
@@ -1182,6 +1281,11 @@ function renderPreview(c){
       <tr class="total"><td class="lbl">Total — B</td>${c.years.map(i=>`<td>${inrPlain(c.termLoanRows[i].interest+c.termLoanRows[i].installment+c.wcLoanRows[i].interest)}</td>`).join("")}</tr>
       <tr class="grand"><td class="lbl">D.S.C.R. = A / B</td>${c.dscr.map(x=>`<td>${x.toFixed(2)}</td>`).join("")}</tr>
     </tbody></table>
+  </div>`;
+
+  // ---- Page 7b: Projected Balance Sheet ----
+  const page7b = `
+  <div class="page" data-pageno="">
     <div class="sec-h"><span class="num">9.3</span>Projected Balance Sheet</div>
     <table class="rpt"><thead><tr><th class="lbl">Liabilities</th>${thYears}</tr></thead><tbody>
       <tr><td class="lbl">Promoters Capital</td>${c.balanceSheet.map(()=>`<td>${inrPlain(c.ownContribution)}</td>`).join("")}</tr>
@@ -1203,9 +1307,9 @@ function renderPreview(c){
     </tbody></table>
   </div>`;
 
-  // ---- Page 8: Cash flow & break-even ----
+  // ---- Page 8: Cash flow ----
   const page8 = `
-  <div class="page" data-pageno="Page 8 of 8">
+  <div class="page" data-pageno="">
     <div class="sec-h"><span class="num">9.4</span>Cash Flow Statement</div>
     <table class="rpt"><thead><tr><th class="lbl">Particulars</th>${thYears}</tr></thead><tbody>
       <tr><td class="lbl">Net Profit</td>${c.netProfit.map(x=>`<td>${inrPlain(x)}</td>`).join("")}</tr>
@@ -1222,7 +1326,11 @@ function renderPreview(c){
       <tr><td class="lbl">Surplus</td>${c.cashFlow.map(cf=>`<td>${inrPlain(cf.surplus)}</td>`).join("")}</tr>
       <tr class="grand"><td class="lbl">Closing Balance</td>${c.cashFlow.map(cf=>`<td>${inrPlain(cf.closingBal)}</td>`).join("")}</tr>
     </tbody></table>
+  </div>`;
 
+  // ---- Page 8b: Break-even, ratio analysis & signature ----
+  const page8b = `
+  <div class="page" data-pageno="">
     <div class="sec-h"><span class="num">9.5</span>Break-Even Point &amp; Ratio Analysis</div>
     <table class="rpt"><thead><tr><th class="lbl">Particulars</th>${thYears}</tr></thead><tbody>
       <tr><td class="lbl">Fixed Cost</td>${c.breakEven.map(b=>`<td>${inrPlain(b.fixedCost)}</td>`).join("")}</tr>
@@ -1247,7 +1355,7 @@ function renderPreview(c){
   </div>`;
 
   const narrative = state.includeNarrative ? buildNarrativePages(c) : "";
-  previewpane.innerHTML = narrative + page1+page2+page3+page4+page5+page6+page7+page8;
+  previewpane.innerHTML = narrative + page1+page2+page3+page3b+page4+page5+page5b+page6+page6b+page7+page7b+page8+page8b;
 
   const allPages = previewpane.querySelectorAll('.page');
   allPages.forEach((el,i)=>{ el.setAttribute('data-pageno', `Page ${i+1} of ${allPages.length}`); });
@@ -1261,18 +1369,73 @@ function update(){
 }
 
 /* =========================================================================
-   SAVE / OPEN PROJECT — keeps every field so a project can be closed and
-   re-opened later without retyping. Two layers:
-     1. Autosave to this browser's localStorage (silent, automatic).
-     2. Save Project / Open Project — a portable .json file the user
-        downloads and can re-open on any device, or hand to a colleague.
+   SAVE / OPEN PROJECT + PROJECT LIBRARY
+   Three layers, from lightest to most durable:
+     1. Draft autosave — a single silent snapshot for brand-new, never-
+        saved work, so a crash/accidental close doesn't lose it.
+     2. Project Library — every project you Save (or Open) lives as its
+        own entry in this browser's storage, so you can keep several
+        applicants' DPRs going and switch between them from "Projects".
+     3. Save Project / Open File — a portable .json file you download,
+        for backup, another computer, or handing to a colleague.
    ========================================================================= */
-const AUTOSAVE_KEY = 'dprGeneratorAutosave_v1';
+const AUTOSAVE_KEY   = 'dprGeneratorAutosave_v1';
+const LIBRARY_KEY    = 'dprGeneratorLibrary_v1';
+const ACTIVE_ID_KEY  = 'dprGeneratorActiveId_v1';
 
 function autosaveToBrowser(){
   try{
-    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({ savedAt: new Date().toISOString(), state }));
+    if(state.__id){
+      // This project already lives in the library — keep that entry
+      // current instead of writing to the generic draft slot.
+      libraryUpsertCurrent();
+    }else{
+      localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({ savedAt: new Date().toISOString(), state }));
+    }
   }catch(e){ /* storage unavailable or full — ignore silently */ }
+}
+
+function projectLabel(s){
+  return (s.name || s.projectName || 'Untitled project');
+}
+
+function libraryLoadAll(){
+  try{
+    const raw = JSON.parse(localStorage.getItem(LIBRARY_KEY) || '[]');
+    return Array.isArray(raw) ? raw : [];
+  }catch(e){ return []; }
+}
+function librarySaveAll(list){
+  try{ localStorage.setItem(LIBRARY_KEY, JSON.stringify(list)); }catch(e){ /* ignore — e.g. storage full */ }
+}
+function setActiveProjectId(id){
+  state.__id = id;
+  try{
+    if(id) localStorage.setItem(ACTIVE_ID_KEY, id);
+    else localStorage.removeItem(ACTIVE_ID_KEY);
+  }catch(e){}
+  renderActiveProjectBar();
+}
+function renderActiveProjectBar(){
+  const bar = document.getElementById('activeProjectBar');
+  const label = document.getElementById('activeProjectLabel');
+  if(state.__id){
+    label.textContent = `${projectLabel(state)} — changes are being kept in this project automatically.`;
+    bar.style.display = 'flex';
+  }else{
+    bar.style.display = 'none';
+  }
+}
+
+function libraryUpsertCurrent(){
+  if(!state.__id) state.__id = 'p_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+  const list = libraryLoadAll();
+  const idx = list.findIndex(p=>p.id===state.__id);
+  const entry = { id: state.__id, label: projectLabel(state), savedAt: new Date().toISOString(), state: JSON.parse(JSON.stringify(state)) };
+  if(idx>-1) list[idx] = entry; else list.unshift(entry);
+  librarySaveAll(list);
+  try{ localStorage.removeItem(AUTOSAVE_KEY); }catch(e){} // superseded by the library entry
+  return entry;
 }
 
 function downloadProjectFile(){
@@ -1280,23 +1443,44 @@ function downloadProjectFile(){
   const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  const label = (state.name || state.projectName || 'project').replace(/[^\w\-]+/g,'_');
+  const label = projectLabel(state).replace(/[^\w\-]+/g,'_');
   a.href = url; a.download = `DPR_${label}.json`;
   document.body.appendChild(a); a.click(); a.remove();
   URL.revokeObjectURL(url);
 }
 
-function loadStateFromObject(obj){
+function loadStateFromObject(obj, opts){
+  opts = opts || {};
   // Merge onto the existing state so any fields added in a newer version
   // of this tool that are missing from an older saved file keep their
-  // defaults instead of becoming undefined.
+  // defaults instead of becoming undefined. Clear stale array/object
+  // fields first so nothing from the previous project lingers.
+  Object.keys(state).forEach(k=>{ if(k!=='__id') delete state[k]; });
+  Object.assign(state, defaultState());
   Object.keys(obj).forEach(k=>{ state[k] = obj[k]; });
   if(!state.capacityUtil || !state.capacityUtil.length) state.capacityUtil = [...CAPACITY_DEFAULTS[state.loanTenure===7?7:5]];
+  setActiveProjectId(opts.id || obj.__id || null);
   renderForm();
   update();
 }
 
-document.getElementById('saveProjectBtn').addEventListener('click', downloadProjectFile);
+function resetToBlankProject(){
+  if(!confirm('Start a new, blank project? Anything not saved to your Projects list will be lost.')) return;
+  Object.keys(state).forEach(k=>delete state[k]);
+  Object.assign(state, defaultState());
+  setActiveProjectId(null);
+  try{ localStorage.removeItem(AUTOSAVE_KEY); }catch(e){}
+  renderForm();
+  update();
+}
+
+document.getElementById('newProjectBtn').addEventListener('click', resetToBlankProject);
+
+document.getElementById('saveProjectBtn').addEventListener('click', ()=>{
+  libraryUpsertCurrent();
+  renderActiveProjectBar();
+  downloadProjectFile();
+});
 
 document.getElementById('loadProjectBtn').addEventListener('click', ()=>{
   document.getElementById('loadProjectInput').click();
@@ -1311,7 +1495,14 @@ document.getElementById('loadProjectInput').addEventListener('change', (e)=>{
       const parsed = JSON.parse(evt.target.result);
       const loadedState = parsed && parsed.state ? parsed.state : parsed; // accept raw state JSON too
       if(!loadedState || typeof loadedState !== 'object') throw new Error('File does not look like a saved project.');
-      loadStateFromObject(loadedState);
+      // A file opened from disk always becomes its own new library entry,
+      // even if it was originally exported from a project already in this
+      // browser's library — strip any embedded id so it can't silently
+      // overwrite an existing entry.
+      delete loadedState.__id;
+      loadStateFromObject(loadedState, {id:null});
+      libraryUpsertCurrent();
+      renderActiveProjectBar();
       alert('Project loaded — all details have been restored.');
     }catch(err){
       alert('Could not open this file as a DPR project: '+err.message);
@@ -1321,6 +1512,88 @@ document.getElementById('loadProjectInput').addEventListener('change', (e)=>{
   e.target.value = ''; // allow re-selecting the same file later
 });
 
+/* ---------- Project Library modal ---------- */
+function fmtWhen(iso){
+  try{ return new Date(iso).toLocaleString(); }catch(e){ return iso||''; }
+}
+function renderLibraryList(){
+  const list = libraryLoadAll().sort((a,b)=> (b.savedAt||'').localeCompare(a.savedAt||''));
+  const el = document.getElementById('libraryList');
+  if(!list.length){
+    el.innerHTML = `<p style="padding:20px;text-align:center;color:#8a8270;font-size:13px;">No saved projects yet. Fill in a project and click <strong>Save Project</strong> to see it here.</p>`;
+    return;
+  }
+  el.innerHTML = list.map(p=>{
+    const active = p.id===state.__id;
+    const who = p.state && (p.state.name || p.state.projectName) ? `<div style="font-size:11.5px;color:#8a8270;margin-top:1px;">${(p.state.projectName && p.state.name) ? p.state.projectName : ''}</div>` : '';
+    return `
+    <div style="display:flex;align-items:center;gap:10px;padding:11px 8px;border-bottom:1px solid var(--line);${active?'background:#faf4e8;':''}">
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:600;font-size:13.5px;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.label||'Untitled project'}${active?' <span style="font-family:var(--mono);font-size:9.5px;color:var(--brass);border:1px solid var(--brass);border-radius:3px;padding:1px 5px;margin-left:4px;">OPEN</span>':''}</div>
+        ${who}
+        <div style="font-size:10.8px;color:#a39d8c;margin-top:2px;">Last edited ${fmtWhen(p.savedAt)}</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;flex:none;">
+        <button class="btn btn-ghost lib-open" data-id="${p.id}" style="padding:5px 10px;font-size:12px;">Open</button>
+        <button class="btn btn-ghost lib-dup" data-id="${p.id}" style="padding:5px 10px;font-size:12px;">Duplicate</button>
+        <button class="btn btn-ghost lib-rename" data-id="${p.id}" style="padding:5px 10px;font-size:12px;">Rename</button>
+        <button class="btn btn-ghost lib-delete" data-id="${p.id}" style="padding:5px 10px;font-size:12px;color:var(--bad);border-color:#e0b8ac;">Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  el.querySelectorAll('.lib-open').forEach(b=>b.addEventListener('click', e=>{
+    const p = libraryLoadAll().find(x=>x.id===e.target.dataset.id);
+    if(!p) return;
+    loadStateFromObject(p.state, {id:p.id});
+    closeLibraryModal();
+  }));
+  el.querySelectorAll('.lib-dup').forEach(b=>b.addEventListener('click', e=>{
+    const list2 = libraryLoadAll();
+    const p = list2.find(x=>x.id===e.target.dataset.id);
+    if(!p) return;
+    const copy = { id:'p_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7), label:(p.label||'Untitled project')+' (Copy)', savedAt:new Date().toISOString(), state: JSON.parse(JSON.stringify(p.state)) };
+    copy.state.__id = copy.id;
+    list2.unshift(copy);
+    librarySaveAll(list2);
+    renderLibraryList();
+  }));
+  el.querySelectorAll('.lib-rename').forEach(b=>b.addEventListener('click', e=>{
+    const list2 = libraryLoadAll();
+    const p = list2.find(x=>x.id===e.target.dataset.id);
+    if(!p) return;
+    const name = prompt('Rename project', p.label||'Untitled project');
+    if(name===null || !name.trim()) return;
+    p.label = name.trim();
+    librarySaveAll(list2);
+    renderLibraryList();
+    if(p.id===state.__id) renderActiveProjectBar();
+  }));
+  el.querySelectorAll('.lib-delete').forEach(b=>b.addEventListener('click', e=>{
+    const id = e.target.dataset.id;
+    const p = libraryLoadAll().find(x=>x.id===id);
+    if(!p) return;
+    if(!confirm(`Delete "${p.label||'this project'}"? This cannot be undone.`)) return;
+    const remaining = libraryLoadAll().filter(x=>x.id!==id);
+    librarySaveAll(remaining);
+    if(id===state.__id) setActiveProjectId(null);
+    renderLibraryList();
+  }));
+}
+function openLibraryModal(){
+  renderLibraryList();
+  document.getElementById('projectLibraryModal').style.display = 'flex';
+}
+function closeLibraryModal(){
+  document.getElementById('projectLibraryModal').style.display = 'none';
+}
+document.getElementById('libraryBtn').addEventListener('click', openLibraryModal);
+document.getElementById('libraryCloseBtn').addEventListener('click', closeLibraryModal);
+document.getElementById('projectLibraryModal').addEventListener('click', e=>{
+  if(e.target.id==='projectLibraryModal') closeLibraryModal();
+});
+
+/* ---------- Draft-autosave restore banner (pre-library projects only) --- */
 function initAutosaveBanner(){
   let saved = null;
   try{ saved = JSON.parse(localStorage.getItem(AUTOSAVE_KEY) || 'null'); }catch(e){ saved = null; }
@@ -1332,13 +1605,36 @@ function initAutosaveBanner(){
   text.textContent = `Found an unsaved project${who} from this browser, last edited ${when}. Restore it, or start blank.`;
   notice.style.display = 'flex';
   document.getElementById('autosaveRestoreBtn').addEventListener('click', ()=>{
-    loadStateFromObject(saved.state);
+    loadStateFromObject(saved.state, {id:null});
     notice.style.display = 'none';
   });
   document.getElementById('autosaveDismissBtn').addEventListener('click', ()=>{
     notice.style.display = 'none';
   });
 }
+
+/* =========================================================================
+   PRINT — content now flows continuously (see the print CSS above: no
+   forced break between sections), so this is just the tips dialog +
+   window.print() directly. No pre-splitting needed any more.
+   ========================================================================= */
+const PRINT_TIPS_SKIP_KEY = 'dprGeneratorSkipPrintTips_v1';
+document.getElementById('pdfBtn').addEventListener('click', ()=>{
+  let skip = false;
+  try{ skip = localStorage.getItem(PRINT_TIPS_SKIP_KEY)==='1'; }catch(e){}
+  if(skip){ window.print(); return; }
+  document.getElementById('printTipsModal').style.display = 'flex';
+});
+document.getElementById('printTipsCancel').addEventListener('click', ()=>{
+  document.getElementById('printTipsModal').style.display = 'none';
+});
+document.getElementById('printTipsContinue').addEventListener('click', ()=>{
+  try{
+    if(document.getElementById('printTipsDontShow').checked) localStorage.setItem(PRINT_TIPS_SKIP_KEY,'1');
+  }catch(e){}
+  document.getElementById('printTipsModal').style.display = 'none';
+  window.print();
+});
 
 /* =========================================================================
    EXCEL EXPORT — live formulas via ExcelJS
@@ -1667,11 +1963,23 @@ function setTenure(yr){
 }
 
 /* =========================================================================
-   INIT
+   INIT — if a project was left open (via the library) last time this
+   browser was used, silently reopen it. Otherwise fall back to the
+   older single-draft autosave banner for anyone who hasn't saved into
+   the library yet.
    ========================================================================= */
-renderForm();
-update();
-initAutosaveBanner();
+(function initOnLoad(){
+  let activeId = null;
+  try{ activeId = localStorage.getItem(ACTIVE_ID_KEY); }catch(e){}
+  const entry = activeId ? libraryLoadAll().find(p=>p.id===activeId) : null;
+  if(entry){
+    loadStateFromObject(entry.state, {id:entry.id});
+  }else{
+    renderForm();
+    update();
+    initAutosaveBanner();
+  }
+})();
 </script>
 </body>
 </html>
